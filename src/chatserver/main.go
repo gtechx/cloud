@@ -5,12 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"gtdb"
-	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"os/signal"
 	"time"
 
+	"github.com/gtechx/base/collections"
 	. "github.com/gtechx/base/common"
 	//"github.com/gtechx/base/gtnet"
 
@@ -19,10 +20,30 @@ import (
 
 var quit chan os.Signal
 
-var nettype string = "tcp"
-var serverAddr string = "127.0.0.1:9090"
-var redisNet string = "tcp"
-var redisAddr string = "192.168.93.16:6379"
+var userOLMap = map[uint64]string{}        //{uid1:serveraddr, uid2:serveraddr}
+var roomMap = map[uint64]map[uint64]bool{} //{rid:{uid1:true, uid2:true}}
+
+type ConnData struct {
+	conn        net.Conn
+	tbl_appdata *gtdb.AppData
+	platform    string
+}
+
+var newConnList = collections.NewSafeList() //*collections.SafeList
+
+type ServerEvent struct {
+	cmd  uint16
+	Data []byte
+}
+
+var serverEventQueue = collections.NewSafeList() //*collections.SafeList
+
+type ServerMsg struct {
+	Uid uint64
+	Msg []byte
+}
+
+var serverMsgQueue = collections.NewSafeList() //*collections.SafeList
 
 type serverconfig struct {
 	ServerAddr string `json:"serveraddr"`
@@ -46,9 +67,9 @@ type serverconfig struct {
 }
 
 var srvconfig *serverconfig
+var isQuit bool
 
 func main() {
-	//var err error
 	quit = make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, os.Kill)
 
@@ -61,66 +82,11 @@ func main() {
 		}
 	}()
 
-	// pnet := flag.String("net", "", "-net=")
-	// paddr := flag.String("addr", "", "-addr=")
-	// //predisnet := flag.String("redisnet", redisNet, "-redisnet=")
-	// predisaddr := flag.String("redisaddr", "", "-redisaddr=")
+	readConfig()
 
-	// flag.Parse()
-
-	// if pnet != nil && *pnet != "" {
-	// 	config.ServerNet = *pnet
-	// }
-	// if paddr != nil && *paddr != "" {
-	// 	config.ServerAddr = *paddr
-	// }
-	// if predisaddr != nil && *predisaddr != "" {
-	// 	config.RedisAddr = *predisaddr
-	// }
-
-	cf, err := os.Open("../res/config/chatserver.config")
-
-	if err != nil {
-		panic("can not open config file chatserver.config")
-	}
-
-	fs, err := cf.Stat()
-
-	if err != nil {
-		panic("get config file chatserver.config stat error:" + err.Error())
-	}
-
-	cbuff := make([]byte, fs.Size())
-	_, err = cf.Read(cbuff)
-
-	if err != nil {
-		panic("read config file chatserver.config error:" + err.Error())
-	}
-
-	srvconfig = &serverconfig{}
-	err = json.Unmarshal(cbuff, srvconfig)
-	if err != nil {
-		panic("json.Unmarshal config file chatserver.config error:" + err.Error())
-	}
+	initDB()
 
 	defer gtdb.Manager().UnInitialize()
-	err = gtdb.Manager().Initialize(string(cbuff))
-	if err != nil {
-		panic("Initialize DB err:" + err.Error())
-	}
-
-	err = gtdb.Manager().ClearOnlineInfo(srvconfig.ServerAddr)
-
-	if err != nil {
-		panic("clear online info err:" + err.Error())
-	}
-
-	//register server
-	err = gtdb.Manager().RegisterServer(srvconfig.ServerAddr)
-
-	if err != nil {
-		panic("register server to gtdata.Manager err:" + err.Error())
-	}
 	defer gtdb.Manager().UnRegisterServer(srvconfig.ServerAddr)
 
 	//init loadbalance
@@ -144,20 +110,147 @@ func main() {
 
 	fmt.Println(srvconfig.ServerNet + " server start on addr " + srvconfig.ServerAddr + " ok...")
 
-	<-quit
+	//frame loop
+	for {
+		//check quit
+		if isQuit {
+			break
+		}
 
-	//chatServerStop()
-	//gtdb.Manager().UnRegisterServer(srvconfig.ServerAddr)
-	//gtdata.Manager().UnInitialize()
-	//EntityManager().CleanOnlineUsers()
+		starttime := time.Now().UnixNano()
+
+		limitcount := 0
+		//create sess for new user
+		for {
+			item, err := newConnList.Pop()
+			if err != nil {
+				break
+			}
+
+			conndata := item.(*ConnData)
+			sess := CreateSess(conndata.conn, conndata.tbl_appdata, conndata.platform)
+			sess.Start()
+
+			limitcount++
+
+			if limitcount >= 10 {
+				break
+			}
+		}
+
+		limitcount = 0
+		//process server event
+		for {
+			item, err := serverEventQueue.Pop()
+			if err != nil {
+				break
+			}
+
+			event := item.(*ServerEvent)
+
+			limitcount++
+
+			if limitcount >= 10 {
+				break
+			}
+		}
+
+		limitcount = 0
+		//process server msg
+		for {
+			item, err := serverMsgQueue.Pop()
+			if err != nil {
+				break
+			}
+
+			msg := item.(*ServerMsg)
+
+			limitcount++
+
+			if limitcount >= 10 {
+				break
+			}
+		}
+
+		//traversal all sess, can parallel the update to diff goroutine
+		for uid, sesslist := sessMap {
+			for platform, sess := sesslist {
+				isess := sess.(ISession)
+				isess.Update()
+			}
+		}
+
+		//remove sess stoped
+
+		endtime := time.Now().UnixNano()
+		delta := endtime-starttime
+		if delta < 10 * 1000000 {
+			time.Sleep((10 * 1000000 - delta ) * time.Duration.Nanosecond)
+		}
+	}
+
+	<-quit
+}
+
+var configjson string
+func readConfig() {
+	// cf, err := os.Open("../res/config/chatserver.config")
+
+	// if err != nil {
+	// 	panic("can not open config file chatserver.config")
+	// }
+
+	// fs, err := cf.Stat()
+
+	// if err != nil {
+	// 	panic("get config file chatserver.config stat error:" + err.Error())
+	// }
+
+	// cbuff := make([]byte, fs.Size())
+	// _, err = cf.Read(cbuff)
+
+	// if err != nil {
+	// 	panic("read config file chatserver.config error:" + err.Error())
+	// }
+	data, err := ioutil.ReadFile("../res/config/chatserver.config")
+	if err != nil {
+		panic("read config file chatserver.config error:" + err.Error())
+	}
+	configjson = string(data)
+
+	srvconfig = &serverconfig{}
+	err = json.Unmarshal(data, srvconfig)
+	if err != nil {
+		panic("json.Unmarshal config file chatserver.config error:" + err.Error())
+	}
+}
+
+func initDB() {
+	dbMgr := gtdb.Manager()
+	err := dbMgr.Initialize(configjson)
+	if err != nil {
+		panic("Initialize DB err:" + err.Error())
+	}
+
+	err = dbMgr.ClearOnlineInfo(srvconfig.ServerAddr)
+
+	if err != nil {
+		panic("clear online info err:" + err.Error())
+	}
+
+	//register server
+	err = dbMgr.RegisterServer(srvconfig.ServerAddr)
+
+	if err != nil {
+		panic("register server to gtdata.Manager err:" + err.Error())
+	}
 }
 
 func onNewConn(conn net.Conn) {
-	//EntityManager().CreateNullEntity(conn)
 	fmt.Println("new conn:", conn.RemoteAddr().String())
 	isok := false
-	defer conn.Close()
-	time.AfterFunc(15*time.Second, func() {
+	//defer conn.Close()
+	time.AfterFunc(5*time.Second, func() {
 		if !isok {
 			conn.Close()
 		}
@@ -170,92 +263,40 @@ func onNewConn(conn net.Conn) {
 		fmt.Println(err.Error())
 		return
 	}
-	if msgid == MsgId_ReqLogin {
-		//account login
-		_, ret := HandlerReqLogin(databuff)
-
-		senddata := packageMsg(RetFrame, id, MsgId_ReqLogin, ret)
-		_, err = conn.Write(senddata)
-
-		if err != nil {
-			return
-		}
-	} else if msgid == MsgId_ReqChatLogin {
+	if msgid == MsgId_ReqChatLogin {
 		fmt.Println(len(databuff))
 		//chat login
-		buff := databuff
-		slen := int(buff[0])
-		account := String(buff[1 : 1+slen])
-		buff = buff[1+slen:]
-		slen = int(buff[0])
-		password := String(buff[1 : 1+slen])
-		buff = buff[1+slen:]
-		slen = int(buff[0])
-		appname := String(buff[1 : 1+slen])
-		buff = buff[1+slen:]
-		slen = int(buff[0])
-		zonename := String(buff[1 : 1+slen])
-		buff = buff[1+slen:]
-		slen = int(buff[0])
-		platform := String(buff[1 : 1+slen])
+		var errcode uint16
+		var appdatabytes []byte
 
-		fmt.Println(account, password, appname, zonename, platform)
-		errcode, ret := HandlerReqChatLogin(account, password, appname, zonename)
+		req := &MsgReqChatLogin{}
+		if jsonUnMarshal(databuff, req, &errcode) {
+			//check if data exists
 
+			//if not create data
+			fmt.Println(req.AppName, req.ZoneName, req.Account, req.Vendor, req.Nickname, conn.RemoteAddr().String())
+			//errcode, ret := createAppdata(req.AppName, req.ZoneName, req.Account, req.Vendor, req.Nickname, conn.RemoteAddr().String())
+			tbl_appdata := &gtdb.AppData{Appname: req.AppName, Zonename: req.ZoneName, Account: req.Account, Vendor:req.Vendor, Nickname: req.Nickname, Regip: conn.RemoteAddr().String()}
+			err = gtdb.Manager().CreateAppData(tbl_appdata)
+
+			if err != nil {
+				errcode = ERR_DB
+			} else {
+				jsonMarshal(tbl_appdata, &appdatabytes, &errcode)
+			}
+		}
+
+		ret := &MsgRetChatLogin{errcode, appdatabytes}
 		senddata := packageMsg(RetFrame, id, MsgId_ReqChatLogin, ret)
 		_, err = conn.Write(senddata)
 
 		if err != nil || errcode != ERR_NONE {
+			conn.Close()
 			return
 		}
 
-	waitenterchat:
-		msgtype, id, size, msgid, databuff, err = readMsgHeader(conn)
-		//errcode := processEnterChat(conn)
-		fmt.Println(msgtype, id, size, msgid)
-		if err == nil && msgid == MsgId_ReqEnterChat {
-			appdataid := Uint64(databuff)
-			defer SessMgr().SetUserOffline(appdataid, platform)
-			//errcode, ret := HandlerReqEnterChat(appdataid)
-			//errcode := ERR_NONE
-			tbl_appdata, err := gtdb.Manager().GetAppData(appdataid)
-			if err != nil {
-				errcode = ERR_DB
-			}
-
-			errcode = SessMgr().SetUserOnline(appdataid, platform)
-
-			senddata := packageMsg(RetFrame, id, MsgId_ReqEnterChat, errcode)
-			_, err = conn.Write(senddata)
-
-			if err != nil {
-				return
-			}
-
-			if errcode == ERR_NONE {
-				fmt.Println("sess start:", appdataid)
-				lastremoteaddr := conn.RemoteAddr().String()
-				lasttime := time.Now()
-				gtdb.Manager().UpdateLastLoginInfo(appdataid, lastremoteaddr, lasttime)
-				sess := SessMgr().CreateSess(conn, tbl_appdata, platform)
-				sess.Start()
-			}
-		} else if err == nil && msgid == MsgId_ReqCreateAppdata {
-			nickname := String(databuff)
-
-			_, ret := HandlerReqCreateAppdata(appname, zonename, account, nickname, conn.RemoteAddr().String())
-			senddata := packageMsg(RetFrame, id, MsgId_ReqCreateAppdata, ret)
-			_, err = conn.Write(senddata)
-
-			if err != nil {
-				return
-			}
-			goto waitenterchat
-		} else if err == nil && msgtype == TickFrame {
-			goto waitenterchat
-		}
+		newConnList.Put(&ConnData{conn, tbl_appdata, platform})
 	}
-	fmt.Println("conn end")
 }
 
 func packageMsg(msgtype uint8, id uint16, msgid uint16, data interface{}) []byte {
@@ -342,38 +383,18 @@ end:
 	return typebuff[0], id, size, msgid, databuff, err
 }
 
-// func processEnterChat(conn net.Conn) uint16 {
-// 	isok := false
-// 	time.AfterFunc(15*time.Second, func() {
-// 		if !isok {
-// 			conn.Close()
-// 		}
-// 	})
+func createAppdata(appname, zonename, account, vendor, nickname, regip string) (uint16, interface{}) {
+	errcode := ERR_NONE
 
-// 	msgtype, id, size, msgid, databuff, err := readMsgHeader(conn)
+	tbl_appdata := &gtdb.AppData{Appname: appname, Zonename: zonename, Account: account, Vendor:vendor, Nickname: nickname, Regip: regip}
+	err := gtdb.Manager().CreateAppData(tbl_appdata)
 
-// 	if err != nil {
-// 		return ERR_UNKNOWN
-// 	}
+	if err != nil {
+		errcode = ERR_DB
+	}
 
-// 	isok = true
-
-// 	if msgid == MsgId_ReqEnterChat {
-// 		appdataid := Uint64(databuff)
-// 		errcode, ret := HandlerReqEnterChat(appdataid)
-// 		senddata := packageMsg(RetFrame, id, MsgId_ReqEnterChat, ret)
-// 		_, err = conn.Write(senddata)
-
-// 		if err != nil {
-// 			conn.Close()
-// 			return ERR_UNKNOWN
-// 		}
-// 		return errcode
-// 	} else {
-// 		conn.Close()
-// 		return ERR_MSG_INVALID
-// 	}
-// }
+	return errcode, tbl_appdata
+}
 
 //first, login with account,appname and zonename
 //server will return all appdataid in the zone of app

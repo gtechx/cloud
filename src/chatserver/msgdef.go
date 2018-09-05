@@ -113,16 +113,17 @@ type MsgRetLoginThirdParty struct {
 const MsgId_ReqChatLogin uint16 = 1001
 
 type MsgReqChatLogin struct {
-	Account  string
-	Password string
-	AppName  string
-	ZoneName string
-	Platform string
+	Account  string `json:"account"`
+	Nickname string `json:"nickname"`
+	AppName  string `json:"appname"`
+	ZoneName string `json:"zonename"`
+	Vendor   string `json:"vendor"`
+	Platform string `json:"platform"`
 }
 
 type MsgRetChatLogin struct {
-	ErrorCode     uint16
-	AppDataIdList []uint64
+	ErrorCode uint16
+	Json      []byte
 }
 
 const MsgId_ReqEnterChat uint16 = 1002

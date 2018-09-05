@@ -313,6 +313,7 @@ type AppData struct {
 	Account   string    `redis:"account" json:"account"`
 	Appname   string    `redis:"appname" json:"appname"`
 	Zonename  string    `redis:"zonename" json:"zonename"`
+	Vendor    string    `redis:"vendor" json:"vendor"`
 	Nickname  string    `redis:"nickname" json:"nickname"`
 	Desc      string    `redis:"desc" json:"desc"`
 	Sex       string    `redis:"sex" json:"sex"`

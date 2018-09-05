@@ -104,6 +104,7 @@ func main() {
 		panic("Initialize DB err:" + err.Error())
 	}
 
+	go startHTTPServer()
 	fmt.Println("server start on addr " + srvconfig.ServerAddr + " ok...")
 
 	<-quit

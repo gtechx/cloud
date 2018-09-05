@@ -20,6 +20,15 @@ type ISession interface {
 	Start()
 	Stop()
 	KickOut()
+	Update()
+}
+
+type MsgData struct {
+	Msgtype  byte
+	Id       uint16
+	Msgid    uint16
+	Datasize uint16
+	Data     []byte
 }
 
 type Sess struct {
@@ -27,6 +36,7 @@ type Sess struct {
 	conn     net.Conn
 	platform string
 
+	msgList   *collections.SafeList
 	sendList  *collections.SafeList
 	quitChan  chan bool
 	errorChan chan bool
@@ -60,9 +70,10 @@ func (s *Sess) Platform() string {
 func (s *Sess) Start() {
 	s.quitChan = make(chan bool, 2) //多个goroutine有可能会quit，所以需要两个，防止阻塞某个goroutine
 	s.errorChan = make(chan bool, 1)
+	s.msgList = collections.NewSafeList()
 	s.sendList = collections.NewSafeList()
 	go s.startRecv()
-	s.startSend()
+	go s.startSend()
 }
 
 func (s *Sess) Stop() {
@@ -89,44 +100,76 @@ func (s *Sess) Send(buff []byte) bool {
 	return true
 }
 
+func (s *Sess) Update() {
+	limitcount := 0
+	//process server msg
+	for {
+		item, err := s.msgList.Pop()
+		if err != nil {
+			break
+		}
+
+		msg := item.(*MsgData)
+
+		errcode, ret := HandleMsg(msg.Msgid, s, msg.Data)
+		if errcode == ERR_MSG_INVALID {
+			fmt.Println("ERR_MSG_INVALID")
+			s.Stop()
+			break
+		}
+		if ret != nil {
+			senddata := packageMsg(RetFrame, msg.Id, msg.Msgid, ret)
+			s.sendList.Put(senddata)
+		}
+
+		limitcount++
+
+		if limitcount >= 10 {
+			break
+		}
+	}
+}
+
 var tickdata = []byte{TickFrame}
 
 func (s *Sess) startRecv() {
 	for {
-		msgtype, id, _, msgid, databuff, err := readMsgHeader(s.conn)
+		msgtype, id, datasize, msgid, databuff, err := readMsgHeader(s.conn)
 		if err != nil {
 			fmt.Println("readMsgHeader error:" + err.Error())
 			s.errorChan <- true
 			break
 		}
+		msgdata := &MsgData{msgtype, id, msgid, datasize, databuff}
+		s.msgList.Put(msgdata)
 
-		switch msgtype {
-		case TickFrame:
-			//s.sendChan <- tickdata
-			s.sendList.Put(tickdata)
-		case EchoFrame:
-			senddata := packageMsg(EchoFrame, id, msgid, databuff)
-			//s.sendChan <- senddata
-			s.sendList.Put(senddata)
-		default:
-			fmt.Println("processing msg:", msgid, " id:", id, " datalen:", len(databuff))
-			if msgid != MsgId_ReqQuitChat {
-				errcode, ret := HandleMsg(msgid, s, databuff)
-				if errcode == ERR_MSG_INVALID {
-					fmt.Println("ERR_MSG_INVALID")
-					s.errorChan <- true
-					goto end
-				}
-				if ret != nil {
-					senddata := packageMsg(RetFrame, id, msgid, ret)
-					//s.sendChan <- senddata
-					s.sendList.Put(senddata)
-				}
-			} else {
-				s.Stop()
-				goto end
-			}
-		}
+		// switch msgtype {
+		// case TickFrame:
+		// 	//s.sendChan <- tickdata
+		// 	s.sendList.Put(tickdata)
+		// case EchoFrame:
+		// 	senddata := packageMsg(EchoFrame, id, msgid, databuff)
+		// 	//s.sendChan <- senddata
+		// 	s.sendList.Put(senddata)
+		// default:
+		// 	fmt.Println("processing msg:", msgid, " id:", id, " datalen:", len(databuff))
+		// 	if msgid != MsgId_ReqQuitChat {
+		// 		errcode, ret := HandleMsg(msgid, s, databuff)
+		// 		if errcode == ERR_MSG_INVALID {
+		// 			fmt.Println("ERR_MSG_INVALID")
+		// 			s.errorChan <- true
+		// 			goto end
+		// 		}
+		// 		if ret != nil {
+		// 			senddata := packageMsg(RetFrame, id, msgid, ret)
+		// 			//s.sendChan <- senddata
+		// 			s.sendList.Put(senddata)
+		// 		}
+		// 	} else {
+		// 		s.Stop()
+		// 		goto end
+		// 	}
+		// }
 	}
 end:
 	fmt.Println("sess recv end")

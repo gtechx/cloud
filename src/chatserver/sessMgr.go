@@ -7,25 +7,14 @@ import (
 	"sync"
 )
 
-type SessManager struct {
-	sessMap *sync.Map
-}
-
-var sessmgr *SessManager
-
-func SessMgr() *SessManager {
-	if sessmgr == nil {
-		sessmgr = &SessManager{sessMap: &sync.Map{}}
-	}
-	return sessmgr
-}
+var sessMap = map[uint64]map[string]ISession//{uid:{web:sess, ios:sess, android:sess}}
 
 var count = 0
 
-func (sm *SessManager) CreateSess(conn net.Conn, tbl_appdata *gtdb.AppData, platform string) ISession {
+func CreateSess(conn net.Conn, tbl_appdata *gtdb.AppData, platform string) ISession {
 	fmt.Println("platform:", platform)
 	sess := &Sess{appdata: tbl_appdata, conn: conn, platform: platform}
-	sesslist := sm.GetSess(tbl_appdata.ID)
+	allsess := GetSess(tbl_appdata.ID)
 	if sesslist == nil {
 		sesslist = &sync.Map{} //map[string]ISession{}
 		sesslist.Store(count, 0)
@@ -42,7 +31,7 @@ func (sm *SessManager) CreateSess(conn net.Conn, tbl_appdata *gtdb.AppData, plat
 	return sess
 }
 
-func (sm *SessManager) DelSess(sess ISession) {
+func DelSess(sess ISession) {
 	sesslist := sm.GetSess(sess.ID())
 	platform := sess.Platform()
 	tmpsess, ok := sesslist.Load(platform)
@@ -60,7 +49,7 @@ func (sm *SessManager) DelSess(sess ISession) {
 	}
 }
 
-func (sm *SessManager) GetSess(id uint64) *sync.Map {
+func GetSess(id uint64) *sync.Map {
 	sesslist, ok := sm.sessMap.Load(id)
 	if ok {
 		return sesslist.(*sync.Map)
@@ -68,7 +57,7 @@ func (sm *SessManager) GetSess(id uint64) *sync.Map {
 	return nil
 }
 
-func (sm *SessManager) SendMsgToId(id uint64, msg []byte) bool {
+func SendMsgToId(id uint64, msg []byte) bool {
 	sesslist := sm.GetSess(id)
 	if sesslist != nil {
 		flag := false
@@ -92,14 +81,14 @@ func (sm *SessManager) SendMsgToId(id uint64, msg []byte) bool {
 	return false
 }
 
-func (sm *SessManager) TrySaveOfflineMsg(id uint64, msg []byte) {
+func TrySaveOfflineMsg(id uint64, msg []byte) {
 	sesslist := sm.GetSess(id)
 	if sesslist == nil {
 		gtdb.Manager().SendMsgToUserOffline(id, msg)
 	}
 }
 
-func (sm *SessManager) SetUserOnline(id uint64, platform string) uint16 {
+func SetUserOnline(id uint64, platform string) uint16 {
 	tbl_online := &gtdb.Online{Dataid: id, Serveraddr: srvconfig.ServerAddr, Platform: platform}
 	err := gtdb.Manager().SetUserOnline(tbl_online)
 	if err != nil {
@@ -108,7 +97,7 @@ func (sm *SessManager) SetUserOnline(id uint64, platform string) uint16 {
 	return ERR_NONE
 }
 
-func (sm *SessManager) SetUserOffline(id uint64, platform string) uint16 {
+func SetUserOffline(id uint64, platform string) uint16 {
 	err := gtdb.Manager().SetUserOffline(id, platform)
 	if err != nil {
 		return ERR_DB
