@@ -7,8 +7,9 @@ import (
 	. "github.com/gtechx/base/common"
 )
 
-func messagePullInit() {
+func messagePullStart() {
 	go startMessagePull()
+	go startEventPull()
 }
 
 func startMessagePull() {
@@ -21,10 +22,28 @@ func startMessagePull() {
 			continue
 		}
 
-		id := Uint64(data[0:8])
-		fmt.Println("transfer msg to ", id, " data ", string(data[8:]))
-		if !SendMsgToId(id, data[8:]) {
-			dbMgr.SendMsgToUserOffline(id, data[8:])
+		uid := Uint64(data)
+		msg := &ServerMsg{Uid: uid, Data: data[8:]}
+		serverMsgQueue.Put(msg)
+		fmt.Println("put msg to ", uid, " data ", string(data[8:]))
+		// if !SendMsgToId(id, data[8:]) {
+		// 	dbMgr.SendMsgToUserOffline(id, data[8:])
+		// }
+	}
+}
+
+func startEventPull() {
+	for {
+		data, err := dbMgr.PullServerEvent(srvconfig.ServerAddr)
+
+		if err != nil {
+			//fmt.Println(err.Error())
+			time.Sleep(200 * time.Millisecond)
+			continue
 		}
+
+		msgid := Uint16(data)
+		msg := &ServerEvent{Msgid: msgid, Data: data[2:]}
+		serverEventQueue.Put(msg)
 	}
 }

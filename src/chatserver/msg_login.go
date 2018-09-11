@@ -18,10 +18,9 @@ import (
 // }
 
 func checkAccount(account, password string) uint16 {
-	dbmgr := gtdb.Manager()
 	errcode := ERR_NONE
 
-	ok, err := dbmgr.IsAccountExists(account)
+	ok, err := dbMgr.IsAccountExists(account)
 
 	if err != nil {
 		errcode = ERR_DB
@@ -29,7 +28,7 @@ func checkAccount(account, password string) uint16 {
 		if !ok {
 			errcode = ERR_ACCOUNT_NOT_EXISTS
 		} else {
-			tbl_account, err := dbmgr.GetAccount(account)
+			tbl_account, err := dbMgr.GetAccount(account)
 
 			if err != nil {
 				errcode = ERR_DB
@@ -53,7 +52,6 @@ func HandlerReqLogin(buff []byte) (uint16, interface{}) {
 	password := String(buff[1 : 1+slen])
 
 	var tokenbytes []byte
-	//dbmgr := gtdb.Manager()
 	errcode := checkAccount(account, password)
 
 	if errcode == ERR_NONE {

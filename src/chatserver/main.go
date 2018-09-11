@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"gtdb"
 	"io"
@@ -10,6 +11,8 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gtechx/base/collections"
@@ -21,8 +24,8 @@ import (
 
 var quit chan os.Signal
 
-var userOLMap = map[uint64]string{}        //{uid1:serveraddr, uid2:serveraddr}
-var roomMap = map[uint64]map[uint64]bool{} //{rid:{uid1:true, uid2:true}}
+var userOLMap = map[uint64]map[string]string{} //{uid1:{ios:serveraddr, pc:serveraddr}}
+var roomMap = map[uint64]map[uint64]bool{}     //{rid:{uid1:true, uid2:true}}
 
 type ConnData struct {
 	conn        net.Conn
@@ -33,15 +36,15 @@ type ConnData struct {
 var newConnList = collections.NewSafeList() //*collections.SafeList
 
 type ServerEvent struct {
-	cmd  uint16
-	Data []byte
+	Msgid uint16
+	Data  []byte
 }
 
 var serverEventQueue = collections.NewSafeList() //*collections.SafeList
 
 type ServerMsg struct {
-	Uid uint64
-	Msg []byte
+	Uid  uint64
+	Data []byte
 }
 
 var serverMsgQueue = collections.NewSafeList() //*collections.SafeList
@@ -72,10 +75,19 @@ type serverconfig struct {
 var srvconfig *serverconfig
 var isQuit bool
 var dbMgr *gtdb.DBManager
+var configpath string = "../res/config/chatserver.config"
 
 func main() {
 	quit = make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, os.Kill)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGILL, syscall.SIGTRAP, syscall.SIGABRT, syscall.SIGBUS, syscall.SIGFPE, syscall.SIGSEGV, syscall.SIGPIPE, syscall.SIGALRM)
+
+	pconfig := flag.String("config", "", "-config=")
+
+	flag.Parse()
+
+	if *pconfig != "" {
+		configpath = *pconfig
+	}
 
 	defer func() {
 		if err := recover(); err != nil {
@@ -93,7 +105,7 @@ func main() {
 	if err != nil {
 		panic("Initialize DB err:" + err.Error())
 	}
-	defer gtdb.Manager().UnInitialize()
+	defer dbMgr.UnInitialize()
 
 	//clear online user
 	err = dbMgr.ClearOnlineInfo(srvconfig.ServerAddr)
@@ -108,10 +120,10 @@ func main() {
 	if err != nil {
 		panic("register server to gtdata.Manager err:" + err.Error())
 	}
-	defer gtdb.Manager().UnRegisterChatServer(srvconfig.ServerAddr)
+	defer dbMgr.UnRegisterChatServer(srvconfig.ServerAddr)
 
 	//init loadbalance
-	loadBanlanceInit()
+	//loadBanlanceStart()
 
 	server := gtnet.NewServer()
 	err = server.Start(srvconfig.ServerNet, srvconfig.ServerAddr, onNewConn)
@@ -119,15 +131,31 @@ func main() {
 		panic(err.Error())
 	}
 	defer server.Stop()
+	defer dbMgr.ClearOnlineInfo(srvconfig.ServerAddr)
 
 	//keep live init
-	keepLiveInit()
+	keepLiveStart()
 
 	//other server live monitor init
-	serverMonitorInit()
+	serverMonitorStart()
 
 	//msg from other server monitor
-	messagePullInit()
+	messagePullStart()
+
+	//read online user
+	users, err := dbMgr.GetAllOnlineUser()
+	if err != nil {
+		panic(err.Error())
+	}
+	for uidandplatform, serveraddr := range users {
+		strarr := strings.Split(uidandplatform, ":")
+		uid := Uint64(strarr[0])
+		platform := strarr[1]
+
+		olinfo := map[string]string{}
+		olinfo[platform] = serveraddr
+		userOLMap[uid] = olinfo
+	}
 
 	fmt.Println(srvconfig.ServerNet + " server start on addr " + srvconfig.ServerAddr + " ok...")
 
@@ -136,8 +164,14 @@ func main() {
 
 	<-quit
 
-	//clear online user
-	err = dbMgr.ClearOnlineInfo(srvconfig.ServerAddr)
+	//clear
+	fmt.Println("clear...")
+	server.Stop()
+	dbMgr.UnRegisterChatServer(srvconfig.ServerAddr)
+	dbMgr.ClearOnlineInfo(srvconfig.ServerAddr)
+	dbMgr.UnInitialize()
+	// var str string
+	// fmt.Scanln(&str)
 }
 
 func loop() {
@@ -161,7 +195,65 @@ func loop() {
 			sess := CreateSess(conndata.conn, conndata.tbl_appdata, conndata.platform)
 			sess.Start()
 
+			//add user to userOLMap
+			olinfo, ok := userOLMap[conndata.tbl_appdata.ID]
+			if !ok {
+				olinfo = map[string]string{}
+				userOLMap[conndata.tbl_appdata.ID] = olinfo
+			}
+			olinfo[conndata.platform] = "" //local server
+			err = dbMgr.AddOnlineUser(conndata.tbl_appdata.ID, conndata.platform, srvconfig.ServerAddr)
+
+			if err != nil {
+				sess.Stop()
+				continue
+			}
+
+			//get room user joined and add room info to roommap
+			roomlist, err := dbMgr.GetRoomListByJoined(conndata.tbl_appdata.ID)
+
+			if err != nil {
+				sess.Stop()
+				continue
+			}
+
+			for _, room := range roomlist {
+				userlist, ok := roomMap[room.Rid]
+				if !ok {
+					userlist = map[uint64]bool{}
+					roomMap[room.Rid] = userlist
+
+					users, err := dbMgr.GetRoomUserIds(room.Rid)
+
+					if err != nil {
+						continue
+					}
+
+					for _, user := range users {
+						userlist[user.Dataid] = true
+					}
+				}
+			}
+
+			//send event to other server
+			serverlist, err := dbMgr.GetChatServerList()
+			if err != nil {
+				sess.Stop()
+				continue
+			}
+
+			msg := &SMsgUserOnline{Uid: conndata.tbl_appdata.ID, PlatformAndServerAddr: conndata.platform + "#" + srvconfig.ServerAddr}
+			msg.MsgId = SMsgId_UserOnline
+			msgbytes := Bytes(msg)
+			for _, serveraddr := range serverlist {
+				err = dbMgr.SendServerEvent(serveraddr, msgbytes)
+				if err != nil {
+					break
+				}
+			}
+
 			limitcount++
+			dbMgr.IncrByChatServerClientCount(srvconfig.ServerAddr, 1)
 
 			if limitcount >= 10 {
 				break
@@ -177,6 +269,57 @@ func loop() {
 			}
 
 			event := item.(*ServerEvent)
+			data := event.Data
+			switch event.Msgid {
+			case SMsgId_UserOnline:
+				uid := Uint64(data[2:])
+				platformandserver := String(data[10:])
+				strarr := strings.Split(platformandserver, "#")
+				platform := strarr[0]
+				serveraddr := strarr[1]
+				olinfo, ok := userOLMap[uid]
+				if !ok {
+					olinfo = map[string]string{}
+					userOLMap[uid] = olinfo
+				}
+				olinfo[platform] = serveraddr //other server
+			case SMsgId_UserOffline:
+				uid := Uint64(data[2:])
+				platform := String(data[10:])
+				olinfo, ok := userOLMap[uid]
+				if ok {
+					_, ok := olinfo[platform]
+					if ok {
+						delete(olinfo, platform)
+						if len(olinfo) == 0 {
+							delete(userOLMap, uid)
+						}
+					}
+				}
+			case SMsgId_RoomAddUser:
+				rid := Uint64(data[2:])
+				uid := Uint64(data[10:])
+				roomusers, ok := roomMap[rid]
+				if ok {
+					roomusers[uid] = true
+				}
+			case SMsgId_RoomRemoveUser:
+				rid := Uint64(data[2:])
+				uid := Uint64(data[10:])
+				roomusers, ok := roomMap[rid]
+				if ok {
+					_, ok := roomusers[uid]
+					if ok {
+						delete(roomusers, uid)
+					}
+				}
+			case SMsgId_RoomDimiss:
+				rid := Uint64(data[2:])
+				_, ok := roomMap[rid]
+				if ok {
+					delete(roomMap, rid)
+				}
+			}
 
 			limitcount++
 
@@ -194,10 +337,13 @@ func loop() {
 			}
 
 			msg := item.(*ServerMsg)
+			if !SendMsgToId(msg.Uid, msg.Data) {
+				dbMgr.SendMsgToUserOffline(msg.Uid, msg.Data)
+			}
 
 			limitcount++
 
-			if limitcount >= 10 {
+			if limitcount >= 100 {
 				break
 			}
 		}
@@ -226,12 +372,65 @@ func loop() {
 				if len(sesslist) == 0 {
 					delete(sessMap, sess.ID())
 				}
+
+				//remove user from userOLMap
+				olinfo, ok := userOLMap[sess.ID()]
+				if ok {
+					delete(olinfo, sess.Platform())
+					if len(olinfo) == 0 {
+						delete(userOLMap, sess.ID())
+					}
+				}
+
+				dbMgr.RemoveOnlineUser(sess.ID(), sess.Platform())
+
+				//get room user joined and add room info to roommap
+				roomlist, err := dbMgr.GetRoomListByJoined(sess.ID())
+
+				if err != nil {
+					continue
+				}
+
+				for _, room := range roomlist {
+					userlist, ok := roomMap[room.Rid]
+					if ok {
+						flag := true
+						for uid, _ := range userlist {
+							_, ok := userOLMap[uid]
+							if ok {
+								flag = false
+								break
+							}
+						}
+
+						if flag {
+							delete(roomMap, room.Rid)
+						}
+					}
+				}
+
+				//send event to other server
+				serverlist, err := dbMgr.GetChatServerList()
+				if err != nil {
+					continue
+				}
+
+				msg := &SMsgUserOffline{Uid: sess.ID(), Platform: sess.Platform()}
+				msg.MsgId = SMsgId_UserOffline
+				msgbytes := Bytes(msg)
+				for _, serveraddr := range serverlist {
+					err = dbMgr.SendServerEvent(serveraddr, msgbytes)
+					if err != nil {
+						break
+					}
+				}
 			}
+			dbMgr.IncrByChatServerClientCount(srvconfig.ServerAddr, -1)
 		}
 
 		endtime := time.Now().UnixNano()
 		delta := endtime - starttime
-		sleeptime := 10*1000000 - delta
+		sleeptime := 20*1000000 - delta
 		if sleeptime > 0 {
 			time.Sleep(time.Duration(sleeptime) * time.Nanosecond)
 		}
@@ -259,7 +458,8 @@ func readConfig() {
 	// if err != nil {
 	// 	panic("read config file chatserver.config error:" + err.Error())
 	// }
-	data, err := ioutil.ReadFile("../res/config/chatserver.config")
+	fmt.Println("reading config:" + configpath)
+	data, err := ioutil.ReadFile(configpath)
 	if err != nil {
 		panic("read config file chatserver.config error:" + err.Error())
 	}
@@ -298,7 +498,7 @@ func onNewConn(conn net.Conn) {
 
 		req := &MsgReqChatLogin{}
 		if jsonUnMarshal(databuff, req, &errcode) {
-			userdata, err := gtdb.Manager().GetChatToken(req.Token)
+			userdata, err := dbMgr.GetChatToken(req.Token)
 
 			if err != nil {
 				errcode = ERR_DB

@@ -27,7 +27,7 @@ func HandlerReqUserData(sess ISession, data []byte) (uint16, interface{}) {
 	if id == 0 {
 		id = sess.ID()
 	}
-	appdata, err := gtdb.Manager().GetAppData(id)
+	appdata, err := dbMgr.GetAppData(id)
 	errcode := ERR_NONE
 	var jsonbytes []byte
 
@@ -489,7 +489,7 @@ func HandlerReqUpdateAppdata(sess ISession, data []byte) (uint16, interface{}) {
 		}
 	}
 
-	err = gtdb.Manager().UpdateAppDataByMap(updatemap)
+	err = dbMgr.UpdateAppDataByMap(updatemap)
 
 	if err != nil {
 		errcode = ERR_DB

@@ -26,7 +26,7 @@ func getChatLoginToken(databytes []byte) (string, error) {
 
 	token := uu.String()
 
-	err = gtdb.Manager().SaveChatLoginToken(token, databytes, srvconfig.TokenTimeout)
+	err = dbMgr.SaveChatLoginToken(token, databytes, srvconfig.TokenTimeout)
 
 	if err != nil {
 		return "", err
@@ -36,7 +36,7 @@ func getChatLoginToken(databytes []byte) (string, error) {
 }
 
 func checkAppname(appname string) (uint16, string) {
-	flag, err := gtdb.Manager().IsAppExists(appname)
+	flag, err := dbMgr.IsAppExists(appname)
 
 	if err != nil {
 		return 1, err.Error()
@@ -65,7 +65,7 @@ func chatlogin(rw http.ResponseWriter, req *http.Request) {
 			goto end
 		}
 
-		appdata, err = gtdb.Manager().GetAppDataByAccount(account, appname)
+		appdata, err = dbMgr.GetAppDataByAccount(account, appname)
 		if err != nil {
 			ret.ErrorCode = 1
 			ret.ErrorDesc = err.Error()
@@ -80,7 +80,7 @@ func chatlogin(rw http.ResponseWriter, req *http.Request) {
 				ret.ErrorDesc = err.Error()
 			} else {
 				//get chat server addr
-				ret.ServerAddr, err = gtdb.Manager().GetChatServer()
+				ret.ServerAddr, err = dbMgr.GetChatServer()
 				if err != nil {
 					ret.ErrorCode = 1
 					ret.ErrorDesc = err.Error()
@@ -122,8 +122,8 @@ func chatcreateuser(rw http.ResponseWriter, req *http.Request) {
 			goto end
 		}
 
-		dbMgr = gtdb.Manager()
-		tbl_appdata, err = gtdb.Manager().GetAppDataByNickname(nickname, appname)
+		dbMgr = dbMgr
+		tbl_appdata, err = dbMgr.GetAppDataByNickname(nickname, appname)
 		if err != nil {
 			ret.ErrorCode = 1
 			ret.ErrorDesc = err.Error()

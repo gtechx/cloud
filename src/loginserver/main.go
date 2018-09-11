@@ -99,13 +99,13 @@ func main() {
 		panic("json.Unmarshal config file loginserver.config error:" + err.Error())
 	}
 
-	defer gtdb.Manager().UnInitialize()
-	err = gtdb.Manager().Initialize(string(cbuff))
+	dbMgr = gtdb.Manager()
+	err = dbMgr.Initialize(string(cbuff))
 	if err != nil {
 		panic("Initialize DB err:" + err.Error())
 	}
+	defer dbMgr.UnInitialize()
 
-	dbMgr = gtdb.Manager()
 	go startHTTPServer()
 	fmt.Println("server start on addr " + srvconfig.ServerAddr + " ok...")
 
@@ -158,7 +158,7 @@ func checkLogin(account, password string) (uint16, string) {
 		return 1, "password must not null"
 	}
 
-	tbl_account, err := gtdb.Manager().GetAccount(account)
+	tbl_account, err := dbMgr.GetAccount(account)
 
 	if err != nil {
 		return 3, "db error:" + err.Error()
@@ -197,7 +197,7 @@ func login(rw http.ResponseWriter, req *http.Request) {
 
 		token = uu.String()
 
-		err = gtdb.Manager().SaveLoginToken(account, token, srvconfig.TokenTimeout)
+		err = dbMgr.SaveLoginToken(account, token, srvconfig.TokenTimeout)
 
 		if err != nil {
 			retmsg.ErrorDesc = "save token error:" + err.Error()
@@ -218,7 +218,7 @@ func verify(rw http.ResponseWriter, req *http.Request) {
 		account := req.PostFormValue("account")
 		token := req.PostFormValue("token")
 
-		dbtoken, err := gtdb.Manager().GetLoginToken(account)
+		dbtoken, err := dbMgr.GetLoginToken(account)
 
 		retmsg := &LoginRetMsg{}
 		if err != nil {

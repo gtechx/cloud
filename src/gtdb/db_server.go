@@ -9,7 +9,7 @@ import (
 
 //[sorted sets]serverlist pair(count,addr)
 //[sets]ttl:addr
-var chatServerKeyName string = "chatserver"
+var chatServerKeyName string = "chatserverlist"
 
 //server op
 func (db *DBManager) RegisterChatServer(addr string) error {
@@ -107,5 +107,40 @@ func (db *DBManager) GetChatToken(token string) ([]byte, error) {
 	conn := db.rd.Get()
 	defer conn.Close()
 	ret, err := conn.Do("GET", "chattoken:"+token)
+	return redis.Bytes(ret, err)
+}
+
+func (db *DBManager) AddOnlineUser(uid uint64, platform, serveraddr string) error {
+	conn := db.rd.Get()
+	defer conn.Close()
+	_, err := conn.Do("HSET", "onlineuser", String(uid)+":"+platform, serveraddr)
+	return err
+}
+
+func (db *DBManager) RemoveOnlineUser(uid uint64, platform string) error {
+	conn := db.rd.Get()
+	defer conn.Close()
+	_, err := conn.Do("HDEL", "onlineuser", String(uid)+":"+platform)
+	return err
+}
+
+func (db *DBManager) GetAllOnlineUser() (map[string]string, error) {
+	conn := db.rd.Get()
+	defer conn.Close()
+	ret, err := conn.Do("HGETALL", "onlineuser")
+	return redis.StringMap(ret, err)
+}
+
+func (db *DBManager) SendServerEvent(serveraddr string, data []byte) error {
+	conn := db.rd.Get()
+	defer conn.Close()
+	_, err := conn.Do("RPUSH", "event:"+serveraddr, data)
+	return err
+}
+
+func (db *DBManager) PullServerEvent(serveraddr string) ([]byte, error) {
+	conn := db.rd.Get()
+	defer conn.Close()
+	ret, err := conn.Do("LPOP", "event:"+serveraddr)
 	return redis.Bytes(ret, err)
 }

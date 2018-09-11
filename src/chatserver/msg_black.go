@@ -16,7 +16,7 @@ func RegisterBlackMsg() {
 }
 
 func isInBlack(id, otherid uint64) (bool, error) {
-	flag, err := gtdb.Manager().IsInBlack(id, otherid)
+	flag, err := dbMgr.IsInBlack(id, otherid)
 	if err != nil {
 		return false, err
 	}

@@ -3,12 +3,10 @@ package main
 import (
 	"io"
 	"net/http"
-
 	//. "github.com/gtechx/base/common"
-	"gtdb"
 )
 
-func loadBanlanceInit() {
+func loadBanlanceStart() {
 	go startHTTPServer()
 	//go starUserRegister()
 }
@@ -19,7 +17,7 @@ func startHTTPServer() {
 }
 
 func getServerList(rw http.ResponseWriter, req *http.Request) {
-	serverlist, _ := gtdb.Manager().GetChatServerList()
+	serverlist, _ := dbMgr.GetChatServerList()
 
 	ret := "{\r\n\t\"serverlist\":\r\n\t[\r\n"
 	for i := 0; i < len(serverlist); i++ {

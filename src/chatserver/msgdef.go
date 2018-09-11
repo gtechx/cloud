@@ -620,3 +620,50 @@ type MsgPublicChannelMessageReceipt struct {
 }
 
 //define RPC
+
+//server internal msg
+type SMsg struct {
+	MsgId uint16
+}
+
+const SMsgId_UserOnline uint16 = 10000
+
+type SMsgUserOnline struct {
+	SMsg
+	Uid                   uint64 `json:"uid"`
+	PlatformAndServerAddr string `json:"platform"` //use # connect platform and serveraddr
+	//ServerAddr string `json:"serveraddr"`
+}
+
+const SMsgId_UserOffline uint16 = 10005
+
+type SMsgUserOffline struct {
+	SMsg
+	Uid      uint64 `json:"uid"`
+	Platform string `json:"platform"`
+}
+
+const SMsgId_RoomAddUser uint16 = 10010
+
+type SMsgRoomAddUser struct {
+	SMsg
+	Rid uint64 `json:"rid"`
+	Uid uint64 `json:"uid"`
+}
+
+const SMsgId_RoomRemoveUser uint16 = 10015
+
+type SMsgRoomRemoveUser struct {
+	SMsg
+	Rid uint64 `json:"rid"`
+	Uid uint64 `json:"uid"`
+}
+
+const SMsgId_RoomDimiss uint16 = 10020
+
+type SMsgRoomDimiss struct {
+	SMsg
+	Rid uint64 `json:"rid"`
+}
+
+//end

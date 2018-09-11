@@ -2,11 +2,9 @@ package main
 
 import (
 	"time"
-
-	"gtdb"
 )
 
-func serverMonitorInit() {
+func serverMonitorStart() {
 	go startServerMonitor()
 }
 
@@ -15,6 +13,6 @@ func startServerMonitor() {
 
 	select {
 	case <-timer.C:
-		gtdb.Manager().CheckChatServerTTL()
+		dbMgr.CheckChatServerTTL()
 	}
 }

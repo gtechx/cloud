@@ -4,19 +4,19 @@ import (
 	//. "github.com/gtechx/Chat/common"
 	//"github.com/gtechx/base/gtnet"
 	"time"
-
-	"gtdb"
 )
 
-func keepLiveInit() {
+func keepLiveStart() {
 	go startServerTTLKeep()
 }
 
 func startServerTTLKeep() {
-	timer := time.NewTimer(time.Second * 30)
+	for {
+		timer := time.NewTimer(time.Second * 30)
 
-	select {
-	case <-timer.C:
-		gtdb.Manager().SetChatServerTTL(srvconfig.ServerAddr, 60)
+		select {
+		case <-timer.C:
+			dbMgr.SetChatServerTTL(srvconfig.ServerAddr, 60)
+		}
 	}
 }

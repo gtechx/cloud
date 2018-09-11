@@ -1,12 +1,9 @@
 package main
 
-import (
-	//. "github.com/gtechx/base/common"
-	"gtdb"
-)
+//. "github.com/gtechx/base/common"
 
 func isAppDataExists(id uint64, perrcode *uint16) bool {
-	flag, err := gtdb.Manager().IsAppDataExists(id)
+	flag, err := dbMgr.IsAppDataExists(id)
 
 	if err != nil {
 		*perrcode = ERR_DB

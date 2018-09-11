@@ -11,7 +11,7 @@ import (
 func createRoom(appdataid uint64, roommsg *MsgReqCreateRoom, perrcode *uint16) bool {
 	tbl_room := &gtdb.Room{Ownerid: appdataid, Roomname: roommsg.RoomName, Roomtype: roommsg.RoomType, Jieshao: roommsg.Jieshao, Notice: roommsg.Notice, Password: roommsg.Password}
 
-	err := gtdb.Manager().CreateRoom(tbl_room)
+	err := dbMgr.CreateRoom(tbl_room)
 
 	if err != nil {
 		*perrcode = ERR_DB
@@ -22,7 +22,7 @@ func createRoom(appdataid uint64, roommsg *MsgReqCreateRoom, perrcode *uint16) b
 }
 
 func deleteRoom(rid uint64, perrcode *uint16) bool {
-	err := gtdb.Manager().DeleteRoom(rid)
+	err := dbMgr.DeleteRoom(rid)
 	if err != nil {
 		*perrcode = ERR_DB
 		return false
@@ -31,7 +31,7 @@ func deleteRoom(rid uint64, perrcode *uint16) bool {
 }
 
 func getRoomList(appdataid uint64, proomlist *[]*gtdb.Room, perrcode *uint16) bool {
-	roomlist, err := gtdb.Manager().GetRoomListByJoined(appdataid)
+	roomlist, err := dbMgr.GetRoomListByJoined(appdataid)
 	if err != nil {
 		*perrcode = ERR_DB
 		return false
@@ -41,7 +41,7 @@ func getRoomList(appdataid uint64, proomlist *[]*gtdb.Room, perrcode *uint16) bo
 }
 
 func getRoomPresenceList(rid uint64, pdatalist *map[string]string, perrcode *uint16) bool {
-	datalist, err := gtdb.Manager().GetAllRoomPresence(rid)
+	datalist, err := dbMgr.GetAllRoomPresence(rid)
 	if err != nil {
 		*perrcode = ERR_DB
 		return false
@@ -51,7 +51,6 @@ func getRoomPresenceList(rid uint64, pdatalist *map[string]string, perrcode *uin
 }
 
 func isRoomFull(rid uint64, perrcode *uint16) bool {
-	
 
 	usercount, err := dbMgr.GetRoomUserCount(rid)
 	if err != nil {
@@ -73,7 +72,6 @@ func isRoomFull(rid uint64, perrcode *uint16) bool {
 }
 
 func isRoomNotFull(rid uint64, perrcode *uint16) bool {
-	
 
 	usercount, err := dbMgr.GetRoomUserCount(rid)
 	if err != nil {
@@ -95,7 +93,6 @@ func isRoomNotFull(rid uint64, perrcode *uint16) bool {
 }
 
 func addRoomUser(rid, appdataid uint64, presence *MsgRoomPresence, perrcode *uint16) bool {
-	
 
 	tbl_roomuser := &gtdb.RoomUser{Rid: rid, Dataid: appdataid}
 	err := dbMgr.AddRoomUser(tbl_roomuser)
@@ -132,7 +129,7 @@ func addRoomUser(rid, appdataid uint64, presence *MsgRoomPresence, perrcode *uin
 }
 
 func sendMessageToRoomUser(rid uint64, msgbytes []byte, perrcode *uint16) bool {
-	
+
 	senddata := packageMsg(RetFrame, 0, MsgId_RoomMessage, msgbytes)
 	userlist, err := dbMgr.GetRoomUserIds(rid)
 
@@ -156,7 +153,7 @@ func sendMessageToRoomUser(rid uint64, msgbytes []byte, perrcode *uint16) bool {
 }
 
 func sendPresenceToRoomUser(rid uint64, presencebytes []byte, perrcode *uint16) bool {
-	
+
 	senddata := packageMsg(RetFrame, 0, MsgId_RoomPresence, presencebytes)
 	userlist, err := dbMgr.GetRoomUserIds(rid)
 
@@ -180,7 +177,7 @@ func sendPresenceToRoomUser(rid uint64, presencebytes []byte, perrcode *uint16) 
 }
 
 func sendPresenceToRoomAdmin(rid uint64, presencebytes []byte, perrcode *uint16) bool {
-	
+
 	senddata := packageMsg(RetFrame, 0, MsgId_RoomPresence, presencebytes)
 	userlist, err := dbMgr.GetRoomAdminIds(rid)
 
@@ -204,7 +201,7 @@ func sendPresenceToRoomAdmin(rid uint64, presencebytes []byte, perrcode *uint16)
 }
 
 func addRoomPresence(rid, appdataid uint64, presence []byte, perrcode *uint16) bool {
-	err := gtdb.Manager().AddRoomPresence(rid, appdataid, presence)
+	err := dbMgr.AddRoomPresence(rid, appdataid, presence)
 	if err != nil {
 		*perrcode = ERR_DB
 		return false
@@ -213,7 +210,7 @@ func addRoomPresence(rid, appdataid uint64, presence []byte, perrcode *uint16) b
 }
 
 func removeRoomPresence(rid, appdataid uint64, perrcode *uint16) bool {
-	err := gtdb.Manager().RemoveRoomPresence(rid, appdataid)
+	err := dbMgr.RemoveRoomPresence(rid, appdataid)
 	if err != nil {
 		*perrcode = ERR_DB
 		return false
@@ -222,7 +219,7 @@ func removeRoomPresence(rid, appdataid uint64, perrcode *uint16) bool {
 }
 
 func addRoomAdmin(rid, appdataid uint64, perrcode *uint16) bool {
-	err := gtdb.Manager().AddRoomAdmin(rid, appdataid)
+	err := dbMgr.AddRoomAdmin(rid, appdataid)
 	if err != nil {
 		*perrcode = ERR_DB
 		return false
@@ -231,7 +228,7 @@ func addRoomAdmin(rid, appdataid uint64, perrcode *uint16) bool {
 }
 
 func removeRoomAdmin(rid, appdataid uint64, perrcode *uint16) bool {
-	err := gtdb.Manager().RemoveRoomAdmin(rid, appdataid)
+	err := dbMgr.RemoveRoomAdmin(rid, appdataid)
 	if err != nil {
 		*perrcode = ERR_DB
 		return false
@@ -240,7 +237,7 @@ func removeRoomAdmin(rid, appdataid uint64, perrcode *uint16) bool {
 }
 
 func jinyanRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
-	err := gtdb.Manager().JinyanRoomUser(rid, appdataid)
+	err := dbMgr.JinyanRoomUser(rid, appdataid)
 	if err != nil {
 		*perrcode = ERR_DB
 		return false
@@ -249,7 +246,7 @@ func jinyanRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
 }
 
 func unjinyanRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
-	err := gtdb.Manager().UnJinyanRoomUser(rid, appdataid)
+	err := dbMgr.UnJinyanRoomUser(rid, appdataid)
 	if err != nil {
 		*perrcode = ERR_DB
 		return false
@@ -258,7 +255,7 @@ func unjinyanRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
 }
 
 func removeRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
-	err := gtdb.Manager().RemoveRoomUser(rid, appdataid)
+	err := dbMgr.RemoveRoomUser(rid, appdataid)
 	if err != nil {
 		*perrcode = ERR_DB
 		return false
@@ -267,7 +264,7 @@ func removeRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
 }
 
 func isRoomPassword(rid uint64, password string, perrcode *uint16) bool {
-	roompassword, err := gtdb.Manager().GetRoomPassword(rid)
+	roompassword, err := dbMgr.GetRoomPassword(rid)
 
 	if err != nil {
 		*perrcode = ERR_DB
@@ -283,7 +280,7 @@ func isRoomPassword(rid uint64, password string, perrcode *uint16) bool {
 }
 
 func getRoomType(rid uint64, proomtype *byte, perrcode *uint16) bool {
-	roomtype, err := gtdb.Manager().GetRoomType(rid)
+	roomtype, err := dbMgr.GetRoomType(rid)
 
 	if err != nil {
 		*perrcode = ERR_DB
@@ -296,7 +293,7 @@ func getRoomType(rid uint64, proomtype *byte, perrcode *uint16) bool {
 }
 
 func isRoomExists(rid uint64, perrcode *uint16) bool {
-	flag, err := gtdb.Manager().IsRoomExists(rid)
+	flag, err := dbMgr.IsRoomExists(rid)
 
 	if err != nil {
 		*perrcode = ERR_DB
@@ -312,7 +309,7 @@ func isRoomExists(rid uint64, perrcode *uint16) bool {
 }
 
 func isRoomNotExists(rid uint64, perrcode *uint16) bool {
-	flag, err := gtdb.Manager().IsRoomExists(rid)
+	flag, err := dbMgr.IsRoomExists(rid)
 
 	if err != nil {
 		*perrcode = ERR_DB
@@ -328,7 +325,7 @@ func isRoomNotExists(rid uint64, perrcode *uint16) bool {
 }
 
 func isRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
-	flag, err := gtdb.Manager().IsRoomUser(rid, appdataid)
+	flag, err := dbMgr.IsRoomUser(rid, appdataid)
 
 	if err != nil {
 		*perrcode = ERR_DB
@@ -344,7 +341,7 @@ func isRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
 }
 
 func isNotRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
-	flag, err := gtdb.Manager().IsRoomUser(rid, appdataid)
+	flag, err := dbMgr.IsRoomUser(rid, appdataid)
 
 	if err != nil {
 		*perrcode = ERR_DB
@@ -360,7 +357,7 @@ func isNotRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
 }
 
 func isRoomOwner(rid, appdataid uint64, perrcode *uint16) bool {
-	flag, err := gtdb.Manager().IsRoomOwner(rid, appdataid)
+	flag, err := dbMgr.IsRoomOwner(rid, appdataid)
 
 	if err != nil {
 		*perrcode = ERR_DB
@@ -376,7 +373,7 @@ func isRoomOwner(rid, appdataid uint64, perrcode *uint16) bool {
 }
 
 func isNotRoomOwner(rid, appdataid uint64, perrcode *uint16) bool {
-	flag, err := gtdb.Manager().IsRoomOwner(rid, appdataid)
+	flag, err := dbMgr.IsRoomOwner(rid, appdataid)
 
 	if err != nil {
 		*perrcode = ERR_DB
@@ -392,7 +389,7 @@ func isNotRoomOwner(rid, appdataid uint64, perrcode *uint16) bool {
 }
 
 func isRoomAdmin(rid, appdataid uint64, perrcode *uint16) bool {
-	flag, err := gtdb.Manager().IsRoomAdmin(rid, appdataid)
+	flag, err := dbMgr.IsRoomAdmin(rid, appdataid)
 
 	if err != nil {
 		*perrcode = ERR_DB
@@ -408,7 +405,7 @@ func isRoomAdmin(rid, appdataid uint64, perrcode *uint16) bool {
 }
 
 func isNotRoomAdmin(rid, appdataid uint64, perrcode *uint16) bool {
-	flag, err := gtdb.Manager().IsRoomAdmin(rid, appdataid)
+	flag, err := dbMgr.IsRoomAdmin(rid, appdataid)
 
 	if err != nil {
 		*perrcode = ERR_DB
@@ -424,7 +421,7 @@ func isNotRoomAdmin(rid, appdataid uint64, perrcode *uint16) bool {
 }
 
 func getRoomUserIds(rid uint64, ids *[]*gtdb.RoomUser, perrcode *uint16) bool {
-	userlist, err := gtdb.Manager().GetRoomUserIds(rid)
+	userlist, err := dbMgr.GetRoomUserIds(rid)
 
 	if err != nil {
 		*perrcode = ERR_DB
@@ -437,7 +434,7 @@ func getRoomUserIds(rid uint64, ids *[]*gtdb.RoomUser, perrcode *uint16) bool {
 }
 
 func getRoomAdminIds(rid uint64, ids *[]*gtdb.RoomUser, perrcode *uint16) bool {
-	userlist, err := gtdb.Manager().GetRoomAdminIds(rid)
+	userlist, err := dbMgr.GetRoomAdminIds(rid)
 
 	if err != nil {
 		*perrcode = ERR_DB
@@ -450,7 +447,7 @@ func getRoomAdminIds(rid uint64, ids *[]*gtdb.RoomUser, perrcode *uint16) bool {
 }
 
 func isRoomPresenceExists(rid, appdataid uint64, perrcode *uint16) bool {
-	flag, err := gtdb.Manager().IsRoomPresenceExists(rid, appdataid)
+	flag, err := dbMgr.IsRoomPresenceExists(rid, appdataid)
 
 	if err != nil {
 		*perrcode = ERR_DB
@@ -466,7 +463,7 @@ func isRoomPresenceExists(rid, appdataid uint64, perrcode *uint16) bool {
 }
 
 func getRoomUserList(rid uint64, puserlist *[]*gtdb.RoomUser, perrcode *uint16) bool {
-	userlist, err := gtdb.Manager().GetRoomUserList(rid)
+	userlist, err := dbMgr.GetRoomUserList(rid)
 
 	if err != nil {
 		*perrcode = ERR_DB
