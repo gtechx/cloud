@@ -19,7 +19,7 @@ func startHTTPServer() {
 }
 
 func getServerList(rw http.ResponseWriter, req *http.Request) {
-	serverlist, _ := gtdb.Manager().GetServerList()
+	serverlist, _ := gtdb.Manager().GetChatServerList()
 
 	ret := "{\r\n\t\"serverlist\":\r\n\t[\r\n"
 	for i := 0; i < len(serverlist); i++ {

@@ -237,8 +237,6 @@ func HandlerReqUpdateRoomSetting(sess ISession, data []byte) (uint16, interface{
 		return errcode, errcode
 	}
 
-	dbMgr := gtdb.Manager()
-
 	if roomsetting.Bit&RoomSetting_RoomName != 0 {
 		err := dbMgr.SetRoomName(roomsetting.Rid, roomsetting.RoomName)
 		if err != nil {

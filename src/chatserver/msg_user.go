@@ -45,7 +45,6 @@ func HandlerReqUserData(sess ISession, data []byte) (uint16, interface{}) {
 }
 
 func SendMessageToUserOnline(to uint64, data []byte) uint16 {
-	dbMgr := gtdb.Manager()
 	addlist, err := dbMgr.GetUserOnlineAddrList(to)
 	if err != nil {
 		return ERR_DB
@@ -56,9 +55,9 @@ func SendMessageToUserOnline(to uint64, data []byte) uint16 {
 
 		if addr == srvconfig.ServerAddr {
 			//如果该用户在这台服务器也有登录，则直接转发
-			SessMgr().SendMsgToId(to, data)
+			SendMsgToId(to, data)
 		} else {
-			err = gtdb.Manager().SendMsgToUserOnline(append(Bytes(to), data...), addr)
+			err = dbMgr.SendMsgToUserOnline(append(Bytes(to), data...), addr)
 			if err != nil {
 				return ERR_DB
 			}
@@ -69,7 +68,7 @@ func SendMessageToUserOnline(to uint64, data []byte) uint16 {
 }
 
 func SendMessageToUserOffline(to uint64, data []byte) uint16 {
-	err := gtdb.Manager().SendMsgToUserOffline(to, data)
+	err := dbMgr.SendMsgToUserOffline(to, data)
 	if err != nil {
 		return ERR_DB
 	}
@@ -77,7 +76,7 @@ func SendMessageToUserOffline(to uint64, data []byte) uint16 {
 }
 
 func SendMessageToUser(to uint64, data []byte) uint16 {
-	dbMgr := gtdb.Manager()
+
 	flag, err := dbMgr.IsUserOnline(to)
 	if err != nil {
 		return ERR_DB
@@ -91,7 +90,7 @@ func SendMessageToUser(to uint64, data []byte) uint16 {
 }
 
 func SendMessageToFriendsOnline(id uint64, data []byte) uint16 {
-	dbMgr := gtdb.Manager()
+
 	friendinfolist, err := dbMgr.GetFriendOnlineList(id)
 	if err != nil {
 		return ERR_DB
@@ -139,7 +138,7 @@ func HandlerPresence(sess ISession, data []byte) (uint16, interface{}) {
 	//presence := &MsgPresence{PresenceType: presencetype, Who: sess.ID(), TimeStamp: timestamp, Message: message}
 
 	errcode := ERR_NONE
-	dbMgr := gtdb.Manager()
+
 	flag, err := dbMgr.IsAppDataExists(who)
 
 	if err != nil {
@@ -276,7 +275,6 @@ func HandlerReqDataList(sess ISession, data []byte) (uint16, interface{}) {
 	datatype := uint8(data[0])
 
 	errcode := ERR_NONE
-	dbMgr := gtdb.Manager()
 
 	ret := &MsgRetDataList{}
 	ret.DataType = datatype
@@ -399,7 +397,7 @@ func HandlerMessage(sess ISession, data []byte) (uint16, interface{}) {
 	//msg := &MsgMessage{Who: sess.ID(), TimeStamp: timestamp, Message: message}
 
 	errcode := ERR_NONE
-	dbMgr := gtdb.Manager()
+
 	flag, err := dbMgr.IsAppDataExists(who)
 
 	if err != nil {
@@ -505,7 +503,7 @@ func HandlerReqModifyFriendComment(sess ISession, data []byte) (uint16, interfac
 	comment := String(data[8:])
 
 	errcode := ERR_NONE
-	dbMgr := gtdb.Manager()
+
 	_, err := dbMgr.GetFriend(sess.ID(), id)
 
 	if err != nil {

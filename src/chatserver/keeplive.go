@@ -17,6 +17,6 @@ func startServerTTLKeep() {
 
 	select {
 	case <-timer.C:
-		gtdb.Manager().SetServerTTL(serverAddr, 60)
+		gtdb.Manager().SetChatServerTTL(srvconfig.ServerAddr, 60)
 	}
 }

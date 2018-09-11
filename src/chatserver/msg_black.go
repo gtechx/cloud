@@ -26,7 +26,6 @@ func isInBlack(id, otherid uint64) (bool, error) {
 func HandlerReqAddBlack(sess ISession, data []byte) (uint16, interface{}) {
 	appdataid := Uint64(data)
 	errcode := ERR_NONE
-	dbMgr := gtdb.Manager()
 
 	flag, err := dbMgr.IsAppDataExists(appdataid)
 	if err != nil {
@@ -58,7 +57,6 @@ func HandlerReqAddBlack(sess ISession, data []byte) (uint16, interface{}) {
 func HandlerReqRemoveBlack(sess ISession, data []byte) (uint16, interface{}) {
 	appdataid := Uint64(data)
 	errcode := ERR_NONE
-	dbMgr := gtdb.Manager()
 
 	flag, err := dbMgr.IsInBlack(sess.ID(), appdataid)
 	if err != nil {

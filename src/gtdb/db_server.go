@@ -9,59 +9,77 @@ import (
 
 //[sorted sets]serverlist pair(count,addr)
 //[sets]ttl:addr
-var serverListKeyName string = "serverlist"
+var chatServerKeyName string = "chatserver"
 
 //server op
-func (db *DBManager) RegisterServer(addr string) error {
+func (db *DBManager) RegisterChatServer(addr string) error {
 	conn := db.rd.Get()
 	defer conn.Close()
-	_, err := conn.Do("ZADD", serverListKeyName, 0, addr)
+	_, err := conn.Do("ZADD", chatServerKeyName, 0, addr)
 
 	return err
 }
 
-func (db *DBManager) UnRegisterServer(addr string) error {
+func (db *DBManager) UnRegisterChatServer(addr string) error {
 	conn := db.rd.Get()
 	defer conn.Close()
-	_, err := conn.Do("ZREM", serverListKeyName, addr)
+	_, err := conn.Do("ZREM", chatServerKeyName, addr)
 
 	return err
 }
 
-func (db *DBManager) IncrByServerClientCount(addr string, count int) error {
+func (db *DBManager) IncrByChatServerClientCount(addr string, count int) error {
 	conn := db.rd.Get()
 	defer conn.Close()
-	_, err := conn.Do("ZINCRBY", serverListKeyName, count, addr)
+	_, err := conn.Do("ZINCRBY", chatServerKeyName, count, addr)
 
 	return err
 }
 
-func (db *DBManager) GetServerList() ([]string, error) {
+func (db *DBManager) GetChatServerList() ([]string, error) {
 	conn := db.rd.Get()
 	defer conn.Close()
 
-	ret, err := conn.Do("ZRANGE", serverListKeyName, 0, -1)
+	ret, err := conn.Do("ZRANGE", chatServerKeyName, 0, -1)
 
 	if err != nil {
 		return nil, err
 	}
 
-	slist, _ := redis.Strings(ret, err)
-	return slist, err
+	return redis.Strings(ret, err)
 }
 
-func (db *DBManager) GetServerCount() (int, error) {
+func (db *DBManager) GetChatServer() (string, error) {
 	conn := db.rd.Get()
 	defer conn.Close()
 
-	ret, err := conn.Do("ZCARD", serverListKeyName)
+	ret, err := conn.Do("ZRANGE", chatServerKeyName, 0, -1)
+
+	if err != nil {
+		return "", err
+	}
+
+	slist, err := redis.Strings(ret, err)
+
+	if err != nil || len(slist) == 0 {
+		return "", err
+	}
+
+	return slist[0], nil
+}
+
+func (db *DBManager) GetChatServerCount() (int, error) {
+	conn := db.rd.Get()
+	defer conn.Close()
+
+	ret, err := conn.Do("ZCARD", chatServerKeyName)
 
 	count, err := redis.Uint64(ret, err)
 
 	return Int(count), err
 }
 
-func (db *DBManager) SetServerTTL(addr string, seconds int) error {
+func (db *DBManager) SetChatServerTTL(addr string, seconds int) error {
 	conn := db.rd.Get()
 	defer conn.Close()
 
@@ -70,10 +88,24 @@ func (db *DBManager) SetServerTTL(addr string, seconds int) error {
 	return err
 }
 
-func (db *DBManager) CheckServerTTL() error {
+func (db *DBManager) CheckChatServerTTL() error {
 	return nil
 }
 
-func (db *DBManager) VoteServerDie() error {
+func (db *DBManager) VoteChatServerDie() error {
 	return nil
+}
+
+func (db *DBManager) SaveChatLoginToken(token string, databytes []byte, timeout int) error {
+	conn := db.rd.Get()
+	defer conn.Close()
+	_, err := conn.Do("SET", "chattoken:"+token, databytes, "EX", timeout)
+	return err
+}
+
+func (db *DBManager) GetChatToken(token string) ([]byte, error) {
+	conn := db.rd.Get()
+	defer conn.Close()
+	ret, err := conn.Do("GET", "chattoken:"+token)
+	return redis.Bytes(ret, err)
 }

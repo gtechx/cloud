@@ -40,21 +40,21 @@ c.服务器消息队列处理，最多处理每帧10个。如：新上线用户添加（包括其他服务器的）、
 d.用户请求处理，可以并行
 
 6.登录服务器作用
-a.聊天本地账号登录，登录信息包括：账号、密码、appid、platform，返回应用数据信息或者空信息用于通知客户端创建应用数据
+a.聊天本地账号登录，登录信息包括：账号、密码、appname、platform，返回应用数据信息或者空信息用于通知客户端创建应用数据
 b.聊天第三方账号登录并创建应用数据, 登录信息包括：appid、vendor、platform、nickname(同一个appid内不可重复)、第三方平台验证数据
 c.聊天第三方服务器账号登录（此处登录主要是为了给其分配internal服务器，负载均衡）
 d.分配真正聊天登录服务器和token
-e.账号登录、验证（账号服务器功能）,返回token和uniqueid
-f.创建应用数据, 应用信息包括：nickname(同一个appid内不可重复)
+e.账号登录、验证（账号服务器功能）,返回token
+f.创建应用数据, 应用信息包括：nickname(同一个appname、zonename内不可重复)
 注意：appname、zone可以用zoneid代替，只要保证zoneid唯一
 
 7.internal服务器作用
 a.聊天第三方服务器账号登录tcp连接并检测ip
 b.发送广播消息：公告、频道消息（世界、当前。。。）
 //c.获取appname和zone列表
-d.创建应用数据, 应用信息包括：uniqueid、appid、zonename、vendor、nickname(同一个zoneid内不可重复)，返回dataid
-e.在线用户管理：禁言/取消禁言用户、创建/删除房间、添加/移除房间用户、添加/移除房间管理员、房主转移、修改房间设置
-f.获取聊天服务器登录token,用于游戏客户端登录聊天服务器,发送信息包括：uniqueid、appid、zonename、vendor、platform，返回token
+d.创建应用数据, 应用信息包括：appname、zonename、nickname(同一个appname、zonename内不可重复)，返回uid
+e.在线用户管理：禁言/取消禁言用户、创建/删除房间、添加/移除房间用户、添加/移除房间管理员、房主转移、修改房间设置、发送消息给用户、修改用户设置/密码
+f.获取聊天服务器登录token,用于游戏客户端登录聊天服务器,发送信息包括：uid、appname、zonename、platform，返回token
 
 8.聊天服务器作用
 a.token登录

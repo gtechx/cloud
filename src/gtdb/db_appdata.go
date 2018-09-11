@@ -17,28 +17,28 @@ func (db *DBManager) CreateAppData(tbl_appdata *AppData) error {
 		tx.Rollback()
 		return err
 	}
-	var count uint64
-	if err := tx.Model(&AccountApp{}).Where("account = ?", tbl_appdata.Account).Where("appname = ?", tbl_appdata.Appname).Count(&count).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	if count == 0 {
-		if err := tx.Create(tbl_appdata.toAccountApp()).Error; err != nil {
-			tx.Rollback()
-			return err
-		}
-	}
+	// var count uint64
+	// if err := tx.Model(&AccountApp{}).Where("account = ?", tbl_appdata.Account).Where("appname = ?", tbl_appdata.Appname).Count(&count).Error; err != nil {
+	// 	tx.Rollback()
+	// 	return err
+	// }
+	// if count == 0 {
+	// 	if err := tx.Create(tbl_appdata.toAccountApp()).Error; err != nil {
+	// 		tx.Rollback()
+	// 		return err
+	// 	}
+	// }
 
-	if err := tx.Model(&AccountZone{}).Where("account = ?", tbl_appdata.Account).Where("appname = ?", tbl_appdata.Appname).Where("zonename = ?", tbl_appdata.Zonename).Count(&count).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	if count == 0 {
-		if err := tx.Create(tbl_appdata.toAccountZone()).Error; err != nil {
-			tx.Rollback()
-			return err
-		}
-	}
+	// if err := tx.Model(&AccountZone{}).Where("account = ?", tbl_appdata.Account).Where("appname = ?", tbl_appdata.Appname).Where("zonename = ?", tbl_appdata.Zonename).Count(&count).Error; err != nil {
+	// 	tx.Rollback()
+	// 	return err
+	// }
+	// if count == 0 {
+	// 	if err := tx.Create(tbl_appdata.toAccountZone()).Error; err != nil {
+	// 		tx.Rollback()
+	// 		return err
+	// 	}
+	// }
 
 	if err := tx.Create(&Group{Groupname: db.dbconfig.DefaultGroupName, Dataid: tbl_appdata.ID}).Error; err != nil {
 		tx.Rollback()
@@ -84,6 +84,24 @@ func (db *DBManager) DeleteAppDatas(ids []uint64) error {
 func (db *DBManager) GetAppData(id uint64) (*AppData, error) {
 	tbl_appdata := &AppData{}
 	retdb := db.sql.Where("id = ?", id).First(tbl_appdata)
+	return tbl_appdata, retdb.Error
+}
+
+func (db *DBManager) GetAppDataByAccount(account, appname string) (*AppData, error) {
+	tbl_appdata := &AppData{}
+	retdb := db.sql.Where("account = ?", account).Where("appname = ?", appname).First(tbl_appdata)
+	if retdb.Error == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	return tbl_appdata, retdb.Error
+}
+
+func (db *DBManager) GetAppDataByNickname(nickname, appname string) (*AppData, error) {
+	tbl_appdata := &AppData{}
+	retdb := db.sql.Where("nickname = ?", nickname).Where("appname = ?", appname).First(tbl_appdata)
+	if retdb.Error == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
 	return tbl_appdata, retdb.Error
 }
 

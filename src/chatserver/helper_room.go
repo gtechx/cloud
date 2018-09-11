@@ -51,7 +51,7 @@ func getRoomPresenceList(rid uint64, pdatalist *map[string]string, perrcode *uin
 }
 
 func isRoomFull(rid uint64, perrcode *uint16) bool {
-	dbMgr := gtdb.Manager()
+	
 
 	usercount, err := dbMgr.GetRoomUserCount(rid)
 	if err != nil {
@@ -73,7 +73,7 @@ func isRoomFull(rid uint64, perrcode *uint16) bool {
 }
 
 func isRoomNotFull(rid uint64, perrcode *uint16) bool {
-	dbMgr := gtdb.Manager()
+	
 
 	usercount, err := dbMgr.GetRoomUserCount(rid)
 	if err != nil {
@@ -95,7 +95,7 @@ func isRoomNotFull(rid uint64, perrcode *uint16) bool {
 }
 
 func addRoomUser(rid, appdataid uint64, presence *MsgRoomPresence, perrcode *uint16) bool {
-	dbMgr := gtdb.Manager()
+	
 
 	tbl_roomuser := &gtdb.RoomUser{Rid: rid, Dataid: appdataid}
 	err := dbMgr.AddRoomUser(tbl_roomuser)
@@ -132,7 +132,7 @@ func addRoomUser(rid, appdataid uint64, presence *MsgRoomPresence, perrcode *uin
 }
 
 func sendMessageToRoomUser(rid uint64, msgbytes []byte, perrcode *uint16) bool {
-	dbMgr := gtdb.Manager()
+	
 	senddata := packageMsg(RetFrame, 0, MsgId_RoomMessage, msgbytes)
 	userlist, err := dbMgr.GetRoomUserIds(rid)
 
@@ -156,7 +156,7 @@ func sendMessageToRoomUser(rid uint64, msgbytes []byte, perrcode *uint16) bool {
 }
 
 func sendPresenceToRoomUser(rid uint64, presencebytes []byte, perrcode *uint16) bool {
-	dbMgr := gtdb.Manager()
+	
 	senddata := packageMsg(RetFrame, 0, MsgId_RoomPresence, presencebytes)
 	userlist, err := dbMgr.GetRoomUserIds(rid)
 
@@ -180,7 +180,7 @@ func sendPresenceToRoomUser(rid uint64, presencebytes []byte, perrcode *uint16) 
 }
 
 func sendPresenceToRoomAdmin(rid uint64, presencebytes []byte, perrcode *uint16) bool {
-	dbMgr := gtdb.Manager()
+	
 	senddata := packageMsg(RetFrame, 0, MsgId_RoomPresence, presencebytes)
 	userlist, err := dbMgr.GetRoomAdminIds(rid)
 

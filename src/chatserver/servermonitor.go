@@ -15,6 +15,6 @@ func startServerMonitor() {
 
 	select {
 	case <-timer.C:
-		gtdb.Manager().CheckServerTTL()
+		gtdb.Manager().CheckChatServerTTL()
 	}
 }

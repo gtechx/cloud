@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 
-	"gtdb"
-
 	. "github.com/gtechx/base/common"
 )
 
@@ -21,7 +19,7 @@ func RegisterSearchMsg() {
 func HandlerReqIdSearch(sess ISession, data []byte) (uint16, interface{}) {
 	appdataid := Uint64(data)
 	errcode := ERR_NONE
-	dbMgr := gtdb.Manager()
+
 	ret := &MsgRetIdSearch{}
 
 	searchret, err := dbMgr.SearchUserById(appdataid)
@@ -44,7 +42,7 @@ func HandlerReqIdSearch(sess ISession, data []byte) (uint16, interface{}) {
 func HandlerReqNicknameSearch(sess ISession, data []byte) (uint16, interface{}) {
 	nickname := String(data)
 	errcode := ERR_NONE
-	dbMgr := gtdb.Manager()
+
 	ret := &MsgRetNicknameSearch{}
 
 	searchret, err := dbMgr.SearchUserByNickname(nickname)
@@ -67,7 +65,7 @@ func HandlerReqNicknameSearch(sess ISession, data []byte) (uint16, interface{}) 
 func HandlerReqRoomSearch(sess ISession, data []byte) (uint16, interface{}) {
 	roomname := String(data)
 	errcode := ERR_NONE
-	dbMgr := gtdb.Manager()
+
 	ret := &MsgRetRoomSearch{}
 
 	searchret, err := dbMgr.SearchRoom(roomname)

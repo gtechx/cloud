@@ -7,6 +7,7 @@ import (
 	"gtdb"
 
 	"github.com/gtechx/base/collections"
+	. "github.com/gtechx/base/common"
 )
 
 type ISession interface {
@@ -21,6 +22,7 @@ type ISession interface {
 	Stop()
 	KickOut()
 	Update()
+	IsClosed() bool
 }
 
 type MsgData struct {
@@ -65,6 +67,10 @@ func (s *Sess) NickName() string {
 
 func (s *Sess) Platform() string {
 	return s.platform
+}
+
+func (s *Sess) IsClosed() bool {
+	return s.isClosed
 }
 
 func (s *Sess) Start() {
@@ -139,6 +145,8 @@ func (s *Sess) startRecv() {
 			fmt.Println("readMsgHeader error:" + err.Error())
 			s.errorChan <- true
 			break
+		} else if msgtype == TickFrame {
+			s.sendList.Put(tickdata)
 		}
 		msgdata := &MsgData{msgtype, id, msgid, datasize, databuff}
 		s.msgList.Put(msgdata)
@@ -171,8 +179,7 @@ func (s *Sess) startRecv() {
 		// 	}
 		// }
 	}
-end:
-	fmt.Println("sess recv end")
+	fmt.Println("session uid " + String(s.ID()) + " recv end")
 }
 
 func (s *Sess) startSend() {
@@ -228,8 +235,9 @@ func (s *Sess) startSend() {
 		}
 	}
 end:
-	fmt.Println("remove session from sessmgr..")
-	SessMgr().DelSess(s)
+	//fmt.Println("remove session from sessmgr..")
+	fmt.Println("session uid " + String(s.ID()) + " send end")
+	//SessMgr().DelSess(s)
 	//count := len(s.sendChan)
 	for {
 		data, err := s.sendList.Pop()
@@ -238,8 +246,11 @@ end:
 		}
 
 		databuff := data.([]byte)
-		SessMgr().TrySaveOfflineMsg(s.ID(), databuff)
+		TrySaveOfflineMsg(s.ID(), databuff)
 	}
+
+	s.conn.Close()
+	toDeleteSessList.Put(s)
 
 	// for i := 0; i < count; i++ {
 	// 	databuff := <-s.sendChan

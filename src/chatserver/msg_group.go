@@ -22,7 +22,7 @@ func HandlerReqAddUserToGroup(sess ISession, data []byte) (uint16, interface{}) 
 	appdataid := Uint64(data)
 	groupname := String(data[8:])
 	errcode := ERR_NONE
-	dbMgr := gtdb.Manager()
+	
 
 	flag, err := dbMgr.IsAppDataExists(appdataid)
 	if err != nil {
@@ -53,7 +53,7 @@ func HandlerReqAddUserToGroup(sess ISession, data []byte) (uint16, interface{}) 
 func HandlerGroupRefresh(sess ISession, data []byte) (uint16, interface{}) {
 	groupname := String(data)
 	errcode := ERR_NONE
-	dbMgr := gtdb.Manager()
+	
 	ret := &MsgRetGroupRefresh{}
 
 	flag, err := dbMgr.IsGroupExists(sess.ID(), groupname)
@@ -94,7 +94,7 @@ func HandlerGroup(sess ISession, data []byte) (uint16, interface{}) {
 	}
 
 	errcode := ERR_NONE
-	dbMgr := gtdb.Manager()
+	
 
 	switch groupmsg.Cmd {
 	case "create":

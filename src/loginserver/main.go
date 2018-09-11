@@ -41,6 +41,7 @@ type serverconfig struct {
 }
 
 var srvconfig *serverconfig
+var dbMgr *gtdb.DBManager
 
 func main() {
 	//var err error
@@ -104,6 +105,7 @@ func main() {
 		panic("Initialize DB err:" + err.Error())
 	}
 
+	dbMgr = gtdb.Manager()
 	go startHTTPServer()
 	fmt.Println("server start on addr " + srvconfig.ServerAddr + " ok...")
 
@@ -115,6 +117,11 @@ func startHTTPServer() {
 	//http.HandleFunc("/serverlist", getServerList)
 	http.HandleFunc("/verify", verify)
 	http.HandleFunc("/login", login)
+
+	http.HandleFunc("/serverlogin", serverlogin)
+
+	http.HandleFunc("/chatlogin", chatlogin)
+	http.HandleFunc("/chatcreateuser", chatcreateuser)
 	http.ListenAndServe(":9001", nil)
 }
 
@@ -134,7 +141,7 @@ func startHTTPServer() {
 // 	io.WriteString(rw, ret)
 // }
 
-type RetMsg struct {
+type LoginRetMsg struct {
 	ErrorDesc string `json:"error,omitempty"`
 	ErrorCode uint16 `json:"errorcode"`
 	//UID       uint64 `json:"uid,string"`
@@ -142,41 +149,41 @@ type RetMsg struct {
 	Token   string `json:"token,omitempty"`
 }
 
+func checkLogin(account, password string) (uint16, string) {
+	if account == "" {
+		return 1, "account must not null"
+	}
+
+	if password == "" {
+		return 1, "password must not null"
+	}
+
+	tbl_account, err := gtdb.Manager().GetAccount(account)
+
+	if err != nil {
+		return 3, "db error:" + err.Error()
+	}
+
+	md5password := GetSaltedPassword(password, tbl_account.Salt)
+	if md5password != tbl_account.Password {
+		return 4, "password not right"
+	}
+
+	return 0, ""
+}
+
 func login(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == "POST" {
 		account := req.PostFormValue("account")
 		password := req.PostFormValue("password")
-		var md5password string
-		var tbl_account *gtdb.Account
 		var err error
 		var token string
 		var uu uuid.UUID
 
-		retmsg := &RetMsg{}
-		if account == "" {
-			retmsg.ErrorDesc = "account must not null"
-			retmsg.ErrorCode = 1
-			goto end
-		}
+		retmsg := &LoginRetMsg{}
 
-		if password == "" {
-			retmsg.ErrorDesc = "password must not null"
-			retmsg.ErrorCode = 2
-			goto end
-		}
-
-		tbl_account, err = gtdb.Manager().GetAccount(account)
-
-		if err != nil {
-			retmsg.ErrorDesc = "db error:" + err.Error()
-			retmsg.ErrorCode = 3
-			goto end
-		}
-
-		md5password = GetSaltedPassword(password, tbl_account.Salt)
-		if md5password != tbl_account.Password {
-			retmsg.ErrorDesc = "password not right"
-			retmsg.ErrorCode = 4
+		retmsg.ErrorCode, retmsg.ErrorDesc = checkLogin(account, password)
+		if retmsg.ErrorCode != 0 {
 			goto end
 		}
 
@@ -213,7 +220,7 @@ func verify(rw http.ResponseWriter, req *http.Request) {
 
 		dbtoken, err := gtdb.Manager().GetLoginToken(account)
 
-		retmsg := &RetMsg{}
+		retmsg := &LoginRetMsg{}
 		if err != nil {
 			retmsg.ErrorDesc = "db error:" + err.Error()
 			retmsg.ErrorCode = 3

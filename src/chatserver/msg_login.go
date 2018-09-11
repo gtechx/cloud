@@ -107,32 +107,32 @@ func HandlerReqLoginThirdParty(data []byte) (uint16, interface{}) {
 	return errcode, errcode
 }
 
-func HandlerReqChatLogin(account, password, appname, zonename string) (uint16, interface{}) {
-	errcode := checkAccount(account, password)
-	if errcode == ERR_NONE {
-		dbMgr := gtdb.Manager()
-		app, err := dbMgr.GetApp(appname)
-		if err != nil {
-			errcode = ERR_DB
-		} else {
-			realappname := appname
-			if app.Share != "" {
-				realappname = app.Share
-			}
-			idlist, err := dbMgr.GetAppDataIdList(realappname, zonename, account)
-			if err != nil {
-				errcode = ERR_DB
-			}
-			ret := &MsgRetChatLogin{errcode, idlist}
-			return errcode, ret
-		}
-	}
-	ret := &MsgRetChatLogin{ErrorCode: errcode}
-	return errcode, ret
-}
+// func HandlerReqChatLogin(account, password, appname, zonename string) (uint16, interface{}) {
+// 	errcode := checkAccount(account, password)
+// 	if errcode == ERR_NONE {
+//
+// 		app, err := dbMgr.GetApp(appname)
+// 		if err != nil {
+// 			errcode = ERR_DB
+// 		} else {
+// 			realappname := appname
+// 			if app.Share != "" {
+// 				realappname = app.Share
+// 			}
+// 			idlist, err := dbMgr.GetAppDataIdList(realappname, zonename, account)
+// 			if err != nil {
+// 				errcode = ERR_DB
+// 			}
+// 			ret := &MsgRetChatLogin{errcode, idlist}
+// 			return errcode, ret
+// 		}
+// 	}
+// 	ret := &MsgRetChatLogin{ErrorCode: errcode}
+// 	return errcode, ret
+// }
 
 func HandlerReqCreateAppdata(appname, zonename, account, nickname, regip string) (uint16, interface{}) {
-	dbMgr := gtdb.Manager()
+
 	errcode := ERR_NONE
 	id := uint64(0)
 
