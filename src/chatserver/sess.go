@@ -211,6 +211,7 @@ func (s *Sess) startSend() {
 			}
 			goto end
 		case <-s.errorChan:
+			fmt.Println("recv s.errorChan")
 			goto end
 		case <-s.sendList.C:
 			for {

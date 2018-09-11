@@ -478,6 +478,7 @@ func onNewConn(conn net.Conn) {
 	//defer conn.Close()
 	time.AfterFunc(5*time.Second, func() {
 		if !isok {
+			fmt.Println("time.AfterFunc conn close")
 			conn.Close()
 		}
 	})
@@ -547,7 +548,6 @@ func readMsgHeader(conn net.Conn) (byte, uint16, uint16, uint16, []byte, error) 
 
 	_, err := io.ReadFull(conn, typebuff)
 	if err != nil {
-		fmt.Println(err.Error())
 		goto end
 	}
 
@@ -559,7 +559,6 @@ func readMsgHeader(conn net.Conn) (byte, uint16, uint16, uint16, []byte, error) 
 
 	_, err = io.ReadFull(conn, idbuff)
 	if err != nil {
-		fmt.Println(err.Error())
 		goto end
 	}
 	id = Uint16(idbuff)
@@ -568,7 +567,6 @@ func readMsgHeader(conn net.Conn) (byte, uint16, uint16, uint16, []byte, error) 
 
 	_, err = io.ReadFull(conn, sizebuff)
 	if err != nil {
-		fmt.Println(err.Error())
 		goto end
 	}
 	size = Uint16(sizebuff)
@@ -582,7 +580,6 @@ func readMsgHeader(conn net.Conn) (byte, uint16, uint16, uint16, []byte, error) 
 
 	_, err = io.ReadFull(conn, msgidbuff)
 	if err != nil {
-		fmt.Println(err.Error())
 		goto end
 	}
 	msgid = Uint16(msgidbuff)
@@ -597,7 +594,6 @@ func readMsgHeader(conn net.Conn) (byte, uint16, uint16, uint16, []byte, error) 
 
 	_, err = io.ReadFull(conn, databuff)
 	if err != nil {
-		fmt.Println(err.Error())
 		goto end
 	}
 end:

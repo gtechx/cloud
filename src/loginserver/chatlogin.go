@@ -10,8 +10,8 @@ import (
 )
 
 type ChatLoginRetMsg struct {
-	ErrorDesc  string `json:"error,omitempty"`
-	ErrorCode  uint16 `json:"errorcode"`
+	ErrorDesc  string `json:"errordesc,omitempty"`
+	ErrorCode  uint16 `json:"errcode"`
 	Token      string `json:"token,omitempty"`
 	ServerAddr string `json:"serveraddr,omitempty"`
 	UserData   string `json:"userdata,omitempty"`
