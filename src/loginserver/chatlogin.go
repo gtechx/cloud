@@ -136,7 +136,7 @@ func chatcreateuser(rw http.ResponseWriter, req *http.Request) {
 			goto end
 		}
 
-		tbl_appdata = &gtdb.AppData{Appname: appname, Account: account, Nickname: nickname, Regip: req.RemoteAddr}
+		tbl_appdata = &gtdb.AppData{Appname: appname, Zonename: "default", Account: account, Nickname: nickname, Regip: req.RemoteAddr}
 		err = dbMgr.CreateAppData(tbl_appdata)
 
 		if err != nil {

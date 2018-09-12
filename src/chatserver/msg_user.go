@@ -57,7 +57,7 @@ func SendMessageToUserOnline(to uint64, data []byte) uint16 {
 			//如果该用户在这台服务器也有登录，则直接转发
 			SendMsgToId(to, data)
 		} else {
-			err = dbMgr.SendMsgToUserOnline(append(Bytes(to), data...), addr)
+			err = dbMgr.SendMsgToServer(append(Bytes(to), data...), addr)
 			if err != nil {
 				return ERR_DB
 			}
@@ -76,17 +76,46 @@ func SendMessageToUserOffline(to uint64, data []byte) uint16 {
 }
 
 func SendMessageToUser(to uint64, data []byte) uint16 {
+	olinfo, ok := userOLMapAll[to]
+	var err error
 
-	flag, err := dbMgr.IsUserOnline(to)
-	if err != nil {
-		return ERR_DB
-	}
-
-	if flag {
-		return SendMessageToUserOnline(to, data)
+	if ok {
+		for saddr, _ := range olinfo {
+			if len(saddr) == 0 {
+				//on local server
+				SendMsgToId(to, data)
+			} else {
+				//on other server
+				msg := &SMsgUserMessage{}
+				msg.MsgId = SMsgId_UserMessage
+				msg.Uid = to
+				msg.Data = data //append(Bytes(who), msgbytes...)
+				// senddata = append(senddata, Bytes(platform)...)
+				// senddata = append(senddata, msgbytes...)
+				err = dbMgr.SendMsgToServer(Bytes(msg), saddr)
+				if err != nil {
+					return ERR_DB
+				}
+			}
+		}
 	} else {
-		return SendMessageToUserOffline(to, data)
+		//offline
+		err = dbMgr.SendMsgToUserOffline(to, data)
+		if err != nil {
+			return ERR_DB
+		}
 	}
+	return ERR_NONE
+	// flag, err := dbMgr.IsUserOnline(to)
+	// if err != nil {
+	// 	return ERR_DB
+	// }
+
+	// if flag {
+	// 	return SendMessageToUserOnline(to, data)
+	// } else {
+	// 	return SendMessageToUserOffline(to, data)
+	// }
 }
 
 func SendMessageToFriendsOnline(id uint64, data []byte) uint16 {
@@ -97,7 +126,7 @@ func SendMessageToFriendsOnline(id uint64, data []byte) uint16 {
 	}
 
 	for _, online := range friendinfolist {
-		err = dbMgr.SendMsgToUserOnline(append(Bytes(online.Dataid), data...), online.Serveraddr)
+		err = dbMgr.SendMsgToServer(append(Bytes(online.Dataid), data...), online.Serveraddr)
 		if err != nil {
 			return ERR_DB
 		}

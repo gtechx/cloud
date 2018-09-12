@@ -124,7 +124,7 @@ func (db *DBManager) GetOfflineMessage(id uint64) ([][]byte, error) {
 	// return msglist, err
 }
 
-func (db *DBManager) SendMsgToUserOnline(msg []byte, serveraddr string) error {
+func (db *DBManager) SendMsgToServer(msg []byte, serveraddr string) error {
 	conn := db.rd.Get()
 	defer conn.Close()
 	_, err := conn.Do("RPUSH", "message:"+serveraddr, msg)

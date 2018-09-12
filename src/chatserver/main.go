@@ -24,8 +24,12 @@ import (
 
 var quit chan os.Signal
 
-var userOLMap = map[uint64]map[string]string{} //{uid1:{ios:serveraddr, pc:serveraddr}}
-var roomMap = map[uint64]map[uint64]bool{}     //{rid:{uid1:true, uid2:true}}
+//var userOLMapAll = map[uint64]map[string]string{} //{uid1:{ios:serveraddr, pc:serveraddr}}
+var userOLMapAll = map[uint64]map[string]bool{} //{uid1:{serveraddr1:true, serveraddr2:true}} //所有服登录用户
+
+var sessMap = map[uint64]map[string]ISession{}  //{uid:{web:sess, ios:sess, android:sess}} //本地登录用户
+var roomMapLocal = map[uint64]map[uint64]bool{} //{rid:{uid1:true, uid2:true}} //本地登录用户所在房间
+//var userOLAppZoneMapLocal = map[string]map[string]map[uint64]bool{} //{appname:{zonename:{uid1:true, uid2:true}}}
 
 type ConnData struct {
 	conn        net.Conn
@@ -43,8 +47,8 @@ type ServerEvent struct {
 var serverEventQueue = collections.NewSafeList() //*collections.SafeList
 
 type ServerMsg struct {
-	Uid  uint64
-	Data []byte
+	Msgid uint16
+	Data  []byte
 }
 
 var serverMsgQueue = collections.NewSafeList() //*collections.SafeList
@@ -150,11 +154,11 @@ func main() {
 	for uidandplatform, serveraddr := range users {
 		strarr := strings.Split(uidandplatform, ":")
 		uid := Uint64(strarr[0])
-		platform := strarr[1]
+		//platform := strarr[1]
 
-		olinfo := map[string]string{}
-		olinfo[platform] = serveraddr
-		userOLMap[uid] = olinfo
+		olinfo := map[string]bool{}
+		olinfo[serveraddr] = true
+		userOLMapAll[uid] = olinfo
 	}
 
 	fmt.Println(srvconfig.ServerNet + " server start on addr " + srvconfig.ServerAddr + " ok...")
@@ -195,68 +199,74 @@ func loop() {
 			sess := CreateSess(conndata.conn, conndata.tbl_appdata, conndata.platform)
 			sess.Start()
 
-			//add user to userOLMap
-			olinfo, ok := userOLMap[conndata.tbl_appdata.ID]
+			//add user to userOLMapAll
+			olinfo, ok := userOLMapAll[conndata.tbl_appdata.ID]
 			if !ok {
-				olinfo = map[string]string{}
-				userOLMap[conndata.tbl_appdata.ID] = olinfo
+				olinfo = map[string]bool{}
+				userOLMapAll[conndata.tbl_appdata.ID] = olinfo
 			}
-			olinfo[conndata.platform] = "" //local server
+			_, ok = olinfo[""]
+
+			if !ok {
+				//if didn't had this id logined on this server
+				olinfo[""] = true //local server
+
+				//get room user joined and add room info to roomMapLocal
+				roomlist, err := dbMgr.GetRoomListByJoined(conndata.tbl_appdata.ID)
+
+				if err != nil {
+					fmt.Println(err.Error())
+					sess.Stop()
+					continue
+				}
+
+				for _, room := range roomlist {
+					userlist, ok := roomMapLocal[room.Rid]
+					if !ok {
+						userlist = map[uint64]bool{}
+						roomMapLocal[room.Rid] = userlist
+
+						users, err := dbMgr.GetRoomUserIds(room.Rid)
+
+						if err != nil {
+							continue
+						}
+
+						for _, user := range users {
+							userlist[user.Dataid] = true
+						}
+					}
+				}
+
+				//send event to other server
+				serverlist, err := dbMgr.GetChatServerList()
+				if err != nil {
+					fmt.Println(err.Error())
+					sess.Stop()
+					continue
+				}
+
+				msg := &SMsgUserOnline{Uid: conndata.tbl_appdata.ID, PlatformAndServerAddr: conndata.platform + "#" + srvconfig.ServerAddr}
+				msg.MsgId = SMsgId_UserOnline
+				msgbytes := Bytes(msg)
+				for _, serveraddr := range serverlist {
+					if serveraddr == srvconfig.ServerAddr {
+						continue
+					}
+					err = dbMgr.SendServerEvent(serveraddr, msgbytes)
+					if err != nil {
+						fmt.Println(err.Error())
+						break
+					}
+				}
+			}
+
 			err = dbMgr.AddOnlineUser(conndata.tbl_appdata.ID, conndata.platform, srvconfig.ServerAddr)
 
 			if err != nil {
 				fmt.Println(err.Error())
 				sess.Stop()
 				continue
-			}
-
-			//get room user joined and add room info to roommap
-			roomlist, err := dbMgr.GetRoomListByJoined(conndata.tbl_appdata.ID)
-
-			if err != nil {
-				fmt.Println(err.Error())
-				sess.Stop()
-				continue
-			}
-
-			for _, room := range roomlist {
-				userlist, ok := roomMap[room.Rid]
-				if !ok {
-					userlist = map[uint64]bool{}
-					roomMap[room.Rid] = userlist
-
-					users, err := dbMgr.GetRoomUserIds(room.Rid)
-
-					if err != nil {
-						continue
-					}
-
-					for _, user := range users {
-						userlist[user.Dataid] = true
-					}
-				}
-			}
-
-			//send event to other server
-			serverlist, err := dbMgr.GetChatServerList()
-			if err != nil {
-				fmt.Println(err.Error())
-				sess.Stop()
-				continue
-			}
-
-			msg := &SMsgUserOnline{Uid: conndata.tbl_appdata.ID, PlatformAndServerAddr: conndata.platform + "#" + srvconfig.ServerAddr}
-			msg.MsgId = SMsgId_UserOnline
-			msgbytes := Bytes(msg)
-			for _, serveraddr := range serverlist {
-				if serveraddr == srvconfig.ServerAddr {
-					continue
-				}
-				err = dbMgr.SendServerEvent(serveraddr, msgbytes)
-				if err != nil {
-					fmt.Println(err.Error())
-					break
-				}
 			}
 
 			limitcount++
@@ -280,41 +290,41 @@ func loop() {
 			fmt.Println("processing server event msgid " + String(event.Msgid))
 			switch event.Msgid {
 			case SMsgId_UserOnline:
-				uid := Uint64(data[2:])
-				platformandserver := String(data[10:])
+				uid := Uint64(data)
+				platformandserver := String(data[8:])
 				strarr := strings.Split(platformandserver, "#")
-				platform := strarr[0]
+				//platform := strarr[0]
 				serveraddr := strarr[1]
-				olinfo, ok := userOLMap[uid]
+				olinfo, ok := userOLMapAll[uid]
 				if !ok {
-					olinfo = map[string]string{}
-					userOLMap[uid] = olinfo
+					olinfo = map[string]bool{}
+					userOLMapAll[uid] = olinfo
 				}
-				olinfo[platform] = serveraddr //other server
+				olinfo[serveraddr] = true //other server
 			case SMsgId_UserOffline:
-				uid := Uint64(data[2:])
-				platform := String(data[10:])
-				olinfo, ok := userOLMap[uid]
+				uid := Uint64(data)
+				serveraddr := String(data[8:])
+				olinfo, ok := userOLMapAll[uid]
 				if ok {
-					_, ok := olinfo[platform]
+					_, ok := olinfo[serveraddr]
 					if ok {
-						delete(olinfo, platform)
+						delete(olinfo, serveraddr)
 						if len(olinfo) == 0 {
-							delete(userOLMap, uid)
+							delete(userOLMapAll, uid)
 						}
 					}
 				}
 			case SMsgId_RoomAddUser:
-				rid := Uint64(data[2:])
-				uid := Uint64(data[10:])
-				roomusers, ok := roomMap[rid]
+				rid := Uint64(data)
+				uid := Uint64(data[8:])
+				roomusers, ok := roomMapLocal[rid]
 				if ok {
 					roomusers[uid] = true
 				}
 			case SMsgId_RoomRemoveUser:
-				rid := Uint64(data[2:])
-				uid := Uint64(data[10:])
-				roomusers, ok := roomMap[rid]
+				rid := Uint64(data)
+				uid := Uint64(data[8:])
+				roomusers, ok := roomMapLocal[rid]
 				if ok {
 					_, ok := roomusers[uid]
 					if ok {
@@ -322,10 +332,10 @@ func loop() {
 					}
 				}
 			case SMsgId_RoomDimiss:
-				rid := Uint64(data[2:])
-				_, ok := roomMap[rid]
+				rid := Uint64(data)
+				_, ok := roomMapLocal[rid]
 				if ok {
-					delete(roomMap, rid)
+					delete(roomMapLocal, rid)
 				}
 			}
 
@@ -345,8 +355,16 @@ func loop() {
 			}
 
 			msg := item.(*ServerMsg)
-			if !SendMsgToId(msg.Uid, msg.Data) {
-				dbMgr.SendMsgToUserOffline(msg.Uid, msg.Data)
+			data := msg.Data
+			fmt.Println("processing server msg msgid " + String(msg.Msgid))
+			switch msg.Msgid {
+			case SMsgId_UserMessage:
+				uid := Uint64(data)
+				SendMsgToId(uid, data[8:])
+			case SMsgId_RoomMessage:
+				rid := Uint64(data)
+				SendMsgToLocalRoom(rid, data[8:])
+			case SMsgId_PublicMessage:
 			}
 
 			limitcount++
@@ -379,62 +397,66 @@ func loop() {
 
 				if len(sesslist) == 0 {
 					delete(sessMap, sess.ID())
-				}
 
-				//remove user from userOLMap
-				olinfo, ok := userOLMap[sess.ID()]
-				if ok {
-					delete(olinfo, sess.Platform())
-					if len(olinfo) == 0 {
-						delete(userOLMap, sess.ID())
+					//只有当id对应的sesslist为0时才从userOLMapAll中删除，并且向其它服务器广播id从该服务器彻底离线的event
+					//remove user from userOLMapAll
+					delete(userOLMapAll, sess.ID())
+					// olinfo, ok := userOLMapAll[sess.ID()]
+					// if ok {
+					// 	delete(olinfo, sess.Platform())
+					// 	if len(olinfo) == 0 {
+					// 		delete(userOLMapAll, sess.ID())
+					// 	}
+					// }
+
+					//get room user joined and add room info to roomMapLocal
+					roomlist, err := dbMgr.GetRoomListByJoined(sess.ID())
+
+					if err != nil {
+						continue
+					}
+
+					for _, room := range roomlist {
+						userlist, ok := roomMapLocal[room.Rid]
+						if ok {
+							flag := true
+							//check if has room use still on this server
+							for uid, _ := range userlist {
+								//_, ok := userOLMapAll[uid]
+								_, ok := sessMap[uid]
+								if ok {
+									flag = false
+									break
+								}
+							}
+
+							if flag {
+								delete(roomMapLocal, room.Rid)
+							}
+						}
+					}
+
+					//send event to other server
+					serverlist, err := dbMgr.GetChatServerList()
+					if err != nil {
+						continue
+					}
+
+					msg := &SMsgUserOffline{Uid: sess.ID(), ServerAddr: srvconfig.ServerAddr}
+					msg.MsgId = SMsgId_UserOffline
+					msgbytes := Bytes(msg)
+					for _, serveraddr := range serverlist {
+						if serveraddr == srvconfig.ServerAddr {
+							continue
+						}
+						err = dbMgr.SendServerEvent(serveraddr, msgbytes)
+						if err != nil {
+							break
+						}
 					}
 				}
 
 				dbMgr.RemoveOnlineUser(sess.ID(), sess.Platform())
-
-				//get room user joined and add room info to roommap
-				roomlist, err := dbMgr.GetRoomListByJoined(sess.ID())
-
-				if err != nil {
-					continue
-				}
-
-				for _, room := range roomlist {
-					userlist, ok := roomMap[room.Rid]
-					if ok {
-						flag := true
-						for uid, _ := range userlist {
-							_, ok := userOLMap[uid]
-							if ok {
-								flag = false
-								break
-							}
-						}
-
-						if flag {
-							delete(roomMap, room.Rid)
-						}
-					}
-				}
-
-				//send event to other server
-				serverlist, err := dbMgr.GetChatServerList()
-				if err != nil {
-					continue
-				}
-
-				msg := &SMsgUserOffline{Uid: sess.ID(), Platform: sess.Platform()}
-				msg.MsgId = SMsgId_UserOffline
-				msgbytes := Bytes(msg)
-				for _, serveraddr := range serverlist {
-					if serveraddr == srvconfig.ServerAddr {
-						continue
-					}
-					err = dbMgr.SendServerEvent(serveraddr, msgbytes)
-					if err != nil {
-						break
-					}
-				}
 			}
 			dbMgr.IncrByChatServerClientCount(srvconfig.ServerAddr, -1)
 		}

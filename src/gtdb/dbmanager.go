@@ -142,6 +142,8 @@ func Manager() *DBManager {
 	return instance
 }
 
+var tblprefix string
+
 func (db *DBManager) Initialize(configjson string) error {
 	dbconfig := &config{}
 	err := json.Unmarshal([]byte(configjson), dbconfig)
@@ -163,6 +165,7 @@ func (db *DBManager) Initialize(configjson string) error {
 		db.rd.UnInitialize()
 		return err
 	}
+	tblprefix = db.sql.prefix
 	return nil
 }
 

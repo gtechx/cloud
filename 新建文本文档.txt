@@ -13,6 +13,17 @@
 
 聊天服务器之间消息定义：
 
+单对单消息发送：
+
+房间消息发送：
+client->server->redis->otherserver->otherclient
+由两部分组成
+a.发送给本地房间内的用户
+b.发送给其他服务器上的房间内用户
+
+公共消息发送：
+client->server->redis->otherserver->otherclient
+
 关于快速向全服所有user发送消息：
 1.首先每个服务器都要保存当前所登录的app和分区内所有的用户id和服务器信息，那么怎样得到这些信息呢？
 首先我们知道，每个服务器会有

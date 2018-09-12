@@ -623,9 +623,10 @@ type MsgPublicChannelMessageReceipt struct {
 
 //server internal msg
 type SMsg struct {
-	MsgId uint16
+	MsgId uint16 `json:"msgid"`
 }
 
+//*********event*************
 const SMsgId_UserOnline uint16 = 10000
 
 type SMsgUserOnline struct {
@@ -639,8 +640,8 @@ const SMsgId_UserOffline uint16 = 10005
 
 type SMsgUserOffline struct {
 	SMsg
-	Uid      uint64 `json:"uid"`
-	Platform string `json:"platform"`
+	Uid        uint64 `json:"uid"`
+	ServerAddr string `json:"serveraddr"`
 }
 
 const SMsgId_RoomAddUser uint16 = 10010
@@ -666,4 +667,30 @@ type SMsgRoomDimiss struct {
 	Rid uint64 `json:"rid"`
 }
 
-//end
+//*********message*************
+const SMsgId_UserMessage uint16 = 20000
+
+type SMsgUserMessage struct {
+	SMsg
+	Uid  uint64 `json:"uid"`
+	Data []byte `json:"data"`
+}
+
+const SMsgId_RoomMessage uint16 = 20005
+
+type SMsgRoomMessage struct {
+	SMsg
+	Rid  uint64 `json:"Rid"`
+	Data []byte `json:"data"`
+}
+
+const SMsgId_PublicMessage uint16 = 20010
+
+type SMsgPublicMessage struct {
+	SMsg
+	Appname  string `json:"appname"`
+	Zonename string `json:"zonename"`
+	Data     []byte `json:"data"`
+}
+
+//server internal msg end

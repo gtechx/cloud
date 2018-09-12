@@ -6,10 +6,6 @@ import (
 	"net"
 )
 
-var sessMap = map[uint64]map[string]ISession{} //{uid:{web:sess, ios:sess, android:sess}}
-
-var count = 0
-
 func CreateSess(conn net.Conn, tbl_appdata *gtdb.AppData, platform string) ISession {
 	fmt.Println("platform:", platform)
 	sess := &Sess{appdata: tbl_appdata, conn: conn, platform: platform}
@@ -61,6 +57,26 @@ func SendMsgToId(id uint64, msg []byte) bool {
 		return flag
 	}
 	return false
+}
+
+func SendMsgByPlatform(id uint64, platform string, msg []byte) {
+	sess, _ := sessMap[id][platform]
+	sess.Send(msg)
+}
+
+func SendMsgToLocalRoom(rid uint64, msg []byte) {
+	roomusers, ok := roomMapLocal[rid]
+	if ok {
+		for uid, _ := range roomusers {
+			sesslist, ok := sessMap[uid]
+
+			if ok {
+				for _, sess := range sesslist {
+					sess.Send(msg)
+				}
+			}
+		}
+	}
 }
 
 func TrySaveOfflineMsg(id uint64, msg []byte) {

@@ -101,7 +101,7 @@ func (filter *OnlineFilter) apply(db *gorm.DB) *gorm.DB {
 
 func (db *DBManager) GetOnlineCount(appname, zonename string, args ...*OnlineFilter) (uint64, error) {
 	var count uint64
-	retdb := db.sql.Table(db.sql.prefix + "app_data a")
+	retdb := db.sql.Table(tblprefix + "app_data a")
 	if appname != "" {
 		retdb = retdb.Where("appname = ?", appname)
 	}
@@ -116,7 +116,7 @@ func (db *DBManager) GetOnlineCount(appname, zonename string, args ...*OnlineFil
 		}
 	}
 
-	retdb = retdb.Joins("join " + db.sql.prefix + "online b on b.dataid = a.id")
+	retdb = retdb.Joins("join " + tblprefix + "online b on b.dataid = a.id")
 
 	retdb = retdb.Count(&count)
 	return count, retdb.Error
@@ -124,7 +124,7 @@ func (db *DBManager) GetOnlineCount(appname, zonename string, args ...*OnlineFil
 
 func (db *DBManager) GetOnlineList(appname, zonename string, offset, count int, args ...*OnlineFilter) ([]*Online, error) {
 	appdatalist := []*Online{}
-	retdb := db.sql.Table(db.sql.prefix + "app_data a").Offset(offset).Limit(count)
+	retdb := db.sql.Table(tblprefix + "app_data a").Offset(offset).Limit(count)
 	if appname != "" {
 		retdb = retdb.Where("appname = ?", appname)
 	}
@@ -139,7 +139,7 @@ func (db *DBManager) GetOnlineList(appname, zonename string, offset, count int, 
 		}
 	}
 
-	retdb = retdb.Joins("join " + db.sql.prefix + "online b on b.dataid = a.id")
+	retdb = retdb.Joins("join " + tblprefix + "online b on b.dataid = a.id")
 
 	retdb = retdb.Select("a.*, b.*").Scan(&appdatalist)
 	return appdatalist, retdb.Error
@@ -147,8 +147,8 @@ func (db *DBManager) GetOnlineList(appname, zonename string, offset, count int, 
 
 func (db *DBManager) GetOnline(id uint64) (*Online, error) {
 	appdata := &Online{}
-	retdb := db.sql.Table(db.sql.prefix + "app_data a")
-	retdb = retdb.Joins("join "+db.sql.prefix+"online b on b.dataid = a.id").Where("dataid = ?", id)
+	retdb := db.sql.Table(tblprefix + "app_data a")
+	retdb = retdb.Joins("join "+tblprefix+"online b on b.dataid = a.id").Where("dataid = ?", id)
 	retdb = retdb.Select("a.*, b.*").Limit(1).Scan(appdata)
 	return appdata, retdb.Error
 }

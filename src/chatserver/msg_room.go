@@ -393,37 +393,39 @@ func HandlerRoomMessage(sess ISession, data []byte) (uint16, interface{}) {
 	// if !sendMessageToRoomUser(roommsg.Rid, msgbytes, &errcode) {
 	// 	return errcode, errcode
 	// }
-	sendMessageToRoomUser(roommsg.Rid, msgbytes, &errcode)
+	//sendMessageToRoomUser(roommsg.Rid, msgbytes, &errcode)
 
-	// if getRoomUserIds(roommsg.Rid, &userlist, &errcode) {
-	// 	var msgbytes []byte
-	// 	if jsonMarshal(roommsg, &msgbytes, &errcode) {
-	// 		senddata := packageMsg(RetFrame, 0, MsgId_RoomMessage, msgbytes)
-	// 		for _, user := range userlist {
-	// 			//broadcast to user in room
-	// 			errcode = SendMessageToUser(user, senddata)
-	// 		}
-	// 	}
-	// }
+	// senddata = append(senddata, Bytes(platform)...)
+	// senddata = append(senddata, msgbytes...)
 
-	// userlist, err := gtdb.Manager().GetRoomUserIds(roommsg.Rid)
+	return SendMsgToRoom(roommsg.Rid, msgbytes)
+}
 
-	// if err != nil {
-	// 	errcode = ERR_DB
-	// } else {
-	// 	msgbytes, err := json.Marshal(roommsg)
-	// 	if err != nil {
-	// 		errcode = ERR_JSON_SERIALIZE
-	// 	} else {
-	// 		senddata := packageMsg(RetFrame, 0, MsgId_RoomMessage, msgbytes)
-	// 		for _, user := range userlist {
-	// 			//broadcast to user in room
-	// 			errcode = SendMessageToUser(user, senddata)
-	// 		}
-	// 	}
-	// }
+func SendMsgToRoom(rid uint64, msgbytes []byte) (uint16, uint16) {
+	senddata := packageMsg(RetFrame, 0, MsgId_RoomMessage, msgbytes)
+	serverlist, err := dbMgr.GetChatServerList()
+	if err != nil {
+		return ERR_DB, ERR_DB
+	}
 
-	return errcode, errcode
+	msg := &SMsgRoomMessage{}
+	msg.MsgId = SMsgId_RoomMessage
+	msg.Rid = rid
+	msg.Data = senddata //append(Bytes(who), msgbytes...)
+	for _, serveraddr := range serverlist {
+		if serveraddr == srvconfig.ServerAddr {
+			continue
+		}
+		//broadcast to other servers
+		err = dbMgr.SendMsgToServer(Bytes(msg), serveraddr)
+		if err != nil {
+			return ERR_DB, ERR_DB
+		}
+	}
+
+	//send to use on local server
+	SendMsgToLocalRoom(rid, senddata)
+	return ERR_NONE, ERR_NONE
 }
 
 func HandlerReqRoomList(sess ISession, data []byte) (uint16, interface{}) {

@@ -79,7 +79,7 @@ func (filter *AppDataJinyanFilter) apply(db *gorm.DB) *gorm.DB {
 
 func (db *DBManager) GetAppDataJinyanCount(appname, zonename string, args ...*AppDataJinyanFilter) (uint64, error) {
 	var count uint64
-	retdb := db.sql.Table(db.sql.prefix + "app_data a")
+	retdb := db.sql.Table(tblprefix + "app_data a")
 	if appname != "" {
 		retdb = retdb.Where("appname = ?", appname)
 	}
@@ -94,7 +94,7 @@ func (db *DBManager) GetAppDataJinyanCount(appname, zonename string, args ...*Ap
 		}
 	}
 
-	retdb = retdb.Joins("join " + db.sql.prefix + "app_data_jinyan b on b.dataid = a.id")
+	retdb = retdb.Joins("join " + tblprefix + "app_data_jinyan b on b.dataid = a.id")
 
 	retdb = retdb.Count(&count)
 	return count, retdb.Error
@@ -102,7 +102,7 @@ func (db *DBManager) GetAppDataJinyanCount(appname, zonename string, args ...*Ap
 
 func (db *DBManager) GetAppDataJinyanList(appname, zonename string, offset, count int, args ...*AppDataJinyanFilter) ([]*AppDataJinyan, error) {
 	appdatalist := []*AppDataJinyan{}
-	retdb := db.sql.Table(db.sql.prefix + "app_data a").Offset(offset).Limit(count)
+	retdb := db.sql.Table(tblprefix + "app_data a").Offset(offset).Limit(count)
 	if appname != "" {
 		retdb = retdb.Where("appname = ?", appname)
 	}
@@ -117,7 +117,7 @@ func (db *DBManager) GetAppDataJinyanList(appname, zonename string, offset, coun
 		}
 	}
 
-	retdb = retdb.Joins("join " + db.sql.prefix + "app_data_jinyan b on b.dataid = a.id")
+	retdb = retdb.Joins("join " + tblprefix + "app_data_jinyan b on b.dataid = a.id")
 
 	retdb = retdb.Select("a.*, b.*").Scan(&appdatalist)
 	return appdatalist, retdb.Error
@@ -125,8 +125,8 @@ func (db *DBManager) GetAppDataJinyanList(appname, zonename string, offset, coun
 
 func (db *DBManager) GetAppDataJinyan(id uint64) (*AppDataJinyan, error) {
 	appdata := &AppDataJinyan{}
-	retdb := db.sql.Table(db.sql.prefix + "app_data a")
-	retdb = retdb.Joins("join "+db.sql.prefix+"app_data_jinyan b on b.dataid = a.id").Where("dataid = ?", id)
+	retdb := db.sql.Table(tblprefix + "app_data a")
+	retdb = retdb.Joins("join "+tblprefix+"app_data_jinyan b on b.dataid = a.id").Where("dataid = ?", id)
 	retdb = retdb.Select("a.*, b.*").Limit(1).Scan(appdata)
 	return appdata, retdb.Error
 }

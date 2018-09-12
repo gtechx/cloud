@@ -148,6 +148,7 @@ func (s *Sess) startRecv() {
 		} else if msgtype == TickFrame {
 			s.sendList.Put(tickdata)
 		}
+		fmt.Println("new msg msgtype:", msgtype, " id:", id, " size:", datasize, " msgid:", msgid, " from uid ", s.ID())
 		msgdata := &MsgData{msgtype, id, msgid, datasize, databuff}
 		s.msgList.Put(msgdata)
 
