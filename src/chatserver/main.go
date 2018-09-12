@@ -249,6 +249,7 @@ func loop() {
 				msg := &SMsgUserOnline{Uid: conndata.tbl_appdata.ID, PlatformAndServerAddr: conndata.platform + "#" + srvconfig.ServerAddr}
 				msg.MsgId = SMsgId_UserOnline
 				msgbytes := Bytes(msg)
+				fmt.Println("cur serverlist:", serverlist)
 				for _, serveraddr := range serverlist {
 					if serveraddr == srvconfig.ServerAddr {
 						continue
@@ -400,14 +401,14 @@ func loop() {
 
 					//只有当id对应的sesslist为0时才从userOLMapAll中删除，并且向其它服务器广播id从该服务器彻底离线的event
 					//remove user from userOLMapAll
-					delete(userOLMapAll, sess.ID())
-					// olinfo, ok := userOLMapAll[sess.ID()]
-					// if ok {
-					// 	delete(olinfo, sess.Platform())
-					// 	if len(olinfo) == 0 {
-					// 		delete(userOLMapAll, sess.ID())
-					// 	}
-					// }
+					//delete(userOLMapAll, sess.ID())
+					olinfo, ok := userOLMapAll[sess.ID()]
+					if ok {
+						delete(olinfo, "")
+						if len(olinfo) == 0 {
+							delete(userOLMapAll, sess.ID())
+						}
+					}
 
 					//get room user joined and add room info to roomMapLocal
 					roomlist, err := dbMgr.GetRoomListByJoined(sess.ID())
@@ -457,7 +458,9 @@ func loop() {
 				}
 
 				dbMgr.RemoveOnlineUser(sess.ID(), sess.Platform())
+
 			}
+
 			dbMgr.IncrByChatServerClientCount(srvconfig.ServerAddr, -1)
 		}
 

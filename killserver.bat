@@ -1,6 +1,6 @@
 echo killing loginserver
-taskkill /f -im loginserver.exe
+taskkill /IM loginserver.exe /T /F
 
 echo killing chatserver
-taskkill /f -im chatserver.exe
+taskkill /IM chatserver.exe /T /F
 
