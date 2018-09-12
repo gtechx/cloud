@@ -83,6 +83,7 @@ func SendMessageToUser(to uint64, data []byte) uint16 {
 		for saddr, _ := range olinfo {
 			if len(saddr) == 0 {
 				//on local server
+				fmt.Println("send msg to local server to ", to)
 				SendMsgToId(to, data)
 			} else {
 				//on other server
@@ -92,6 +93,7 @@ func SendMessageToUser(to uint64, data []byte) uint16 {
 				msg.Data = data //append(Bytes(who), msgbytes...)
 				// senddata = append(senddata, Bytes(platform)...)
 				// senddata = append(senddata, msgbytes...)
+				fmt.Println("send msg to server ", saddr, " to ", to)
 				err = dbMgr.SendMsgToServer(Bytes(msg), saddr)
 				if err != nil {
 					return ERR_DB

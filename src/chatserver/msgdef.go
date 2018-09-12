@@ -217,6 +217,7 @@ type MsgMessageJson struct {
 	TimeStamp int64  `json:"timestamp,string"`
 	Nickname  string `json:"nickname"`
 	Message   string `json:"message"`
+	Platform  string `json:"platform"`
 }
 
 type MsgMessageReceipt struct {
@@ -559,6 +560,7 @@ type MsgRoomMessage struct {
 	TimeStamp int64  `json:"timestamp,string"`
 	Nickname  string `json:"nickname"`
 	Message   string `json:"message"`
+	Platform  string `json:"platform"`
 }
 
 type MsgRoomReceipt struct {
