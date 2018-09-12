@@ -44,6 +44,7 @@ func (wa wsAddr) String() string {
 type wsConn struct {
 	*websocket.Conn
 	remoteAddr net.Addr
+	quitchan   chan bool
 }
 
 func (wc *wsConn) RemoteAddr() net.Addr {
@@ -51,13 +52,21 @@ func (wc *wsConn) RemoteAddr() net.Addr {
 	return wc.remoteAddr
 }
 
+func (wc *wsConn) Close() error {
+	//override Close() of websocket.Conn
+	err := wc.Conn.Close()
+	wc.quitchan <- true
+	return err
+}
+
 func (this *WsServer) accept(conn *websocket.Conn) {
 	conn.PayloadType = websocket.BinaryFrame
 
-	wsconn := &wsConn{Conn: conn, remoteAddr: wsAddr(conn.Request().RemoteAddr)}
+	wsconn := &wsConn{Conn: conn, remoteAddr: wsAddr(conn.Request().RemoteAddr), quitchan: make(chan bool, 1)}
 	if this.onNewConn != nil {
 		this.onNewConn(wsconn)
 	}
+	<-wsconn.quitchan
 	//WsConn.serve()
 	// go wsconn.startSend()
 	// wsconn.startRecv()

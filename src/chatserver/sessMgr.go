@@ -21,6 +21,7 @@ func CreateSess(conn net.Conn, tbl_appdata *gtdb.AppData, platform string) ISess
 	oldsess, ok := sesslist[platform]
 	sesslist[platform] = sess
 	if ok {
+		fmt.Println("KickOut old sess, platform:", oldsess.Platform())
 		oldsess.(ISession).KickOut()
 	}
 	return sess

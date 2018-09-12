@@ -205,6 +205,7 @@ func loop() {
 			err = dbMgr.AddOnlineUser(conndata.tbl_appdata.ID, conndata.platform, srvconfig.ServerAddr)
 
 			if err != nil {
+				fmt.Println(err.Error())
 				sess.Stop()
 				continue
 			}
@@ -213,6 +214,7 @@ func loop() {
 			roomlist, err := dbMgr.GetRoomListByJoined(conndata.tbl_appdata.ID)
 
 			if err != nil {
+				fmt.Println(err.Error())
 				sess.Stop()
 				continue
 			}
@@ -238,6 +240,7 @@ func loop() {
 			//send event to other server
 			serverlist, err := dbMgr.GetChatServerList()
 			if err != nil {
+				fmt.Println(err.Error())
 				sess.Stop()
 				continue
 			}
@@ -246,8 +249,12 @@ func loop() {
 			msg.MsgId = SMsgId_UserOnline
 			msgbytes := Bytes(msg)
 			for _, serveraddr := range serverlist {
+				if serveraddr == srvconfig.ServerAddr {
+					continue
+				}
 				err = dbMgr.SendServerEvent(serveraddr, msgbytes)
 				if err != nil {
+					fmt.Println(err.Error())
 					break
 				}
 			}
@@ -270,6 +277,7 @@ func loop() {
 
 			event := item.(*ServerEvent)
 			data := event.Data
+			fmt.Println("processing server event msgid " + String(event.Msgid))
 			switch event.Msgid {
 			case SMsgId_UserOnline:
 				uid := Uint64(data[2:])
@@ -419,6 +427,9 @@ func loop() {
 				msg.MsgId = SMsgId_UserOffline
 				msgbytes := Bytes(msg)
 				for _, serveraddr := range serverlist {
+					if serveraddr == srvconfig.ServerAddr {
+						continue
+					}
 					err = dbMgr.SendServerEvent(serveraddr, msgbytes)
 					if err != nil {
 						break
@@ -485,13 +496,12 @@ func onNewConn(conn net.Conn) {
 
 	msgtype, id, size, msgid, databuff, err := readMsgHeader(conn)
 	isok = true
-	fmt.Println(msgtype, id, size, msgid)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
+	fmt.Println("new msg msgtype:", msgtype, " id:", id, " size:", size, " msgid:", msgid)
 	if msgid == MsgId_ReqChatLogin {
-		fmt.Println(len(databuff))
 		//chat login
 		var errcode uint16
 		var appdatabytes []byte
@@ -505,6 +515,7 @@ func onNewConn(conn net.Conn) {
 				errcode = ERR_DB
 			} else {
 				jsonUnMarshal(userdata, tbl_appdata, &errcode)
+				fmt.Println("uid:", tbl_appdata.ID, " logined success")
 			}
 		}
 
@@ -513,10 +524,12 @@ func onNewConn(conn net.Conn) {
 		_, err = conn.Write(senddata)
 
 		if err != nil || errcode != ERR_NONE {
+			fmt.Println(err.Error())
 			conn.Close()
 			return
 		}
 
+		fmt.Println(tbl_appdata)
 		newConnList.Put(&ConnData{conn, tbl_appdata, req.Platform})
 	}
 }
