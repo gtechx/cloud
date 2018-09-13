@@ -293,14 +293,14 @@ func loop() {
 					sess.Stop()
 					continue
 				}
-			}
 
-			err = dbMgr.AddOnlineUser(srvconfig.ServerAddr, conndata.tbl_appdata.ID)
+				err = dbMgr.AddOnlineUser(srvconfig.ServerAddr, conndata.tbl_appdata.ID)
 
-			if err != nil {
-				fmt.Println(err.Error())
-				sess.Stop()
-				continue
+				if err != nil {
+					fmt.Println(err.Error())
+					sess.Stop()
+					continue
+				}
 			}
 
 			limitcount++
