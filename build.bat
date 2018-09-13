@@ -6,5 +6,3 @@ REM set GOOS=windows
 
 go install -tags debug loginserver 
 go install -tags debug chatserver 
-
-pause

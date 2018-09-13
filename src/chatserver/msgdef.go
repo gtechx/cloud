@@ -204,16 +204,17 @@ type MsgPresenceReceipt struct {
 
 const MsgId_Message uint16 = 1008
 
-type MsgMessage struct {
-	//MessageType uint8 //chat, friends, multi
-	Who       uint64 `json:"who"` //使用who，表示客户端填充的接收者，服务器转发时会修改为发送者
-	TimeStamp int64  `json:"timestamp"`
-	Message   []byte `json:"message"`
-}
+// type MsgMessage struct {
+// 	//MessageType uint8 //chat, friends, multi
+// 	Who       uint64 `json:"who"` //使用who，表示客户端填充的接收者，服务器转发时会修改为发送者
+// 	TimeStamp int64  `json:"timestamp"`
+// 	Message   []byte `json:"message"`
+// }
 
 type MsgMessageJson struct {
 	//MessageType uint8 //chat, friends, multi
-	Who       uint64 `json:"who,string"` //使用who，表示客户端填充的接收者，服务器转发时会修改为发送者
+	From      uint64 `json:"from,string"` //使用who，表示客户端填充的接收者，服务器转发时会修改为发送者
+	To        uint64 `json:"to,string"`
 	TimeStamp int64  `json:"timestamp,string"`
 	Nickname  string `json:"nickname"`
 	Message   string `json:"message"`
@@ -633,8 +634,8 @@ const SMsgId_UserOnline uint16 = 10000
 
 type SMsgUserOnline struct {
 	SMsg
-	Uid                   uint64 `json:"uid"`
-	PlatformAndServerAddr string `json:"platform"` //use # connect platform and serveraddr
+	Uid        uint64 `json:"uid"`
+	ServerAddr string `json:"serveraddr"` //use # connect platform and serveraddr
 	//ServerAddr string `json:"serveraddr"`
 }
 

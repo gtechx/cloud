@@ -11,7 +11,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -126,8 +125,39 @@ func main() {
 	}
 	defer dbMgr.UnRegisterChatServer(srvconfig.ServerAddr)
 
-	//init loadbalance
-	//loadBanlanceStart()
+	//keep live init
+	keepLiveStart()
+
+	//check server
+	//checkAllServerAlive()
+
+	//other server live monitor init
+	serverMonitorStart()
+
+	//read online user
+	serverlist, err := dbMgr.GetChatServerList()
+
+	if err != nil {
+		panic(err.Error())
+	}
+
+	for _, serveraddr := range serverlist {
+		users, err := dbMgr.GetAllOnlineUser(serveraddr)
+		if err != nil {
+			panic(err.Error())
+		}
+		for _, iuid := range users {
+			uid := Uint64(iuid)
+			olinfo, ok := userOLMapAll[uid]
+
+			if !ok {
+				olinfo = map[string]bool{}
+				userOLMapAll[uid] = olinfo
+			}
+
+			olinfo[serveraddr] = true
+		}
+	}
 
 	server := gtnet.NewServer()
 	err = server.Start(srvconfig.ServerNet, srvconfig.ServerAddr, onNewConn)
@@ -137,29 +167,8 @@ func main() {
 	defer server.Stop()
 	defer dbMgr.ClearOnlineInfo(srvconfig.ServerAddr)
 
-	//keep live init
-	keepLiveStart()
-
-	//other server live monitor init
-	serverMonitorStart()
-
 	//msg from other server monitor
 	messagePullStart()
-
-	//read online user
-	users, err := dbMgr.GetAllOnlineUser()
-	if err != nil {
-		panic(err.Error())
-	}
-	for uidandplatform, serveraddr := range users {
-		strarr := strings.Split(uidandplatform, ":")
-		uid := Uint64(strarr[0])
-		//platform := strarr[1]
-
-		olinfo := map[string]bool{}
-		olinfo[serveraddr] = true
-		userOLMapAll[uid] = olinfo
-	}
 
 	fmt.Println(srvconfig.ServerNet + " server start on addr " + srvconfig.ServerAddr + " ok...")
 
@@ -176,6 +185,28 @@ func main() {
 	dbMgr.UnInitialize()
 	// var str string
 	// fmt.Scanln(&str)
+}
+
+func addOLUser(serveraddr string, uid uint64) {
+	olinfo, ok := userOLMapAll[uid]
+	if !ok {
+		olinfo = map[string]bool{}
+		userOLMapAll[uid] = olinfo
+	}
+	olinfo[serveraddr] = true //other server
+}
+
+func removeOLUser(serveraddr string, uid uint64) {
+	olinfo, ok := userOLMapAll[uid]
+	if ok {
+		_, ok := olinfo[serveraddr]
+		if ok {
+			delete(olinfo, serveraddr)
+			if len(olinfo) == 0 {
+				delete(userOLMapAll, uid)
+			}
+		}
+	}
 }
 
 func loop() {
@@ -206,11 +237,9 @@ func loop() {
 				userOLMapAll[conndata.tbl_appdata.ID] = olinfo
 			}
 			_, ok = olinfo[""]
-
+			olinfo[""] = true //local server
 			if !ok {
 				//if didn't had this id logined on this server
-				olinfo[""] = true //local server
-
 				//get room user joined and add room info to roomMapLocal
 				roomlist, err := dbMgr.GetRoomListByJoined(conndata.tbl_appdata.ID)
 
@@ -246,7 +275,7 @@ func loop() {
 					continue
 				}
 
-				msg := &SMsgUserOnline{Uid: conndata.tbl_appdata.ID, PlatformAndServerAddr: conndata.platform + "#" + srvconfig.ServerAddr}
+				msg := &SMsgUserOnline{Uid: conndata.tbl_appdata.ID, ServerAddr: srvconfig.ServerAddr}
 				msg.MsgId = SMsgId_UserOnline
 				msgbytes := Bytes(msg)
 				fmt.Println("cur serverlist:", serverlist)
@@ -262,7 +291,7 @@ func loop() {
 				}
 			}
 
-			err = dbMgr.AddOnlineUser(conndata.tbl_appdata.ID, conndata.platform, srvconfig.ServerAddr)
+			err = dbMgr.AddOnlineUser(srvconfig.ServerAddr, conndata.tbl_appdata.ID)
 
 			if err != nil {
 				fmt.Println(err.Error())
@@ -292,29 +321,15 @@ func loop() {
 			switch event.Msgid {
 			case SMsgId_UserOnline:
 				uid := Uint64(data)
-				platformandserver := String(data[8:])
-				strarr := strings.Split(platformandserver, "#")
-				//platform := strarr[0]
-				serveraddr := strarr[1]
-				olinfo, ok := userOLMapAll[uid]
-				if !ok {
-					olinfo = map[string]bool{}
-					userOLMapAll[uid] = olinfo
-				}
-				olinfo[serveraddr] = true //other server
+				serveraddr := String(data[8:])
+				// strarr := strings.Split(platformandserver, "#")
+				// //platform := strarr[0]
+				// serveraddr := strarr[1]
+				addOLUser(serveraddr, uid)
 			case SMsgId_UserOffline:
 				uid := Uint64(data)
 				serveraddr := String(data[8:])
-				olinfo, ok := userOLMapAll[uid]
-				if ok {
-					_, ok := olinfo[serveraddr]
-					if ok {
-						delete(olinfo, serveraddr)
-						if len(olinfo) == 0 {
-							delete(userOLMapAll, uid)
-						}
-					}
-				}
+				removeOLUser(serveraddr, uid)
 			case SMsgId_RoomAddUser:
 				rid := Uint64(data)
 				uid := Uint64(data[8:])
@@ -402,13 +417,14 @@ func loop() {
 					//只有当id对应的sesslist为0时才从userOLMapAll中删除，并且向其它服务器广播id从该服务器彻底离线的event
 					//remove user from userOLMapAll
 					//delete(userOLMapAll, sess.ID())
-					olinfo, ok := userOLMapAll[sess.ID()]
-					if ok {
-						delete(olinfo, "")
-						if len(olinfo) == 0 {
-							delete(userOLMapAll, sess.ID())
-						}
-					}
+					// olinfo, ok := userOLMapAll[sess.ID()]
+					// if ok {
+					// 	delete(olinfo, "")
+					// 	if len(olinfo) == 0 {
+					// 		delete(userOLMapAll, sess.ID())
+					// 	}
+					// }
+					removeOLUser("", sess.ID())
 
 					//get room user joined and add room info to roomMapLocal
 					roomlist, err := dbMgr.GetRoomListByJoined(sess.ID())
@@ -455,10 +471,9 @@ func loop() {
 							break
 						}
 					}
+
+					dbMgr.RemoveOnlineUser(srvconfig.ServerAddr, sess.ID())
 				}
-
-				dbMgr.RemoveOnlineUser(sess.ID(), sess.Platform())
-
 			}
 
 			dbMgr.IncrByChatServerClientCount(srvconfig.ServerAddr, -1)

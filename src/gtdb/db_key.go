@@ -571,7 +571,7 @@ type AppDataJson struct {
 }
 
 type FriendJson struct {
-	Dataid    uint64 `json:"who,string"`
+	Uid       uint64 `json:"who,string"`
 	Nickname  string `json:"nickname"`
 	Desc      string `json:"desc"`
 	Groupname string `json:"groupname"`

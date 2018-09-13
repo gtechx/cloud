@@ -11,12 +11,13 @@ func keepLiveStart() {
 }
 
 func startServerTTLKeep() {
+	dbMgr.InitChatServerTTL(srvconfig.ServerAddr, 2)
 	for {
-		timer := time.NewTimer(time.Second * 30)
+		timer := time.NewTimer(time.Second * 1)
 
 		select {
 		case <-timer.C:
-			dbMgr.SetChatServerTTL(srvconfig.ServerAddr, 60)
+			dbMgr.UpdateChatServerTTL(srvconfig.ServerAddr, 2)
 		}
 	}
 }

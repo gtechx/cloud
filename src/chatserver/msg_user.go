@@ -44,33 +44,67 @@ func HandlerReqUserData(sess ISession, data []byte) (uint16, interface{}) {
 	return errcode, ret
 }
 
-func SendMessageToUserOnline(to uint64, data []byte) uint16 {
-	addlist, err := dbMgr.GetUserOnlineAddrList(to)
-	if err != nil {
-		return ERR_DB
-	}
+// func SendMessageToUserOnline(to uint64, data []byte) uint16 {
+// 	addlist, err := dbMgr.GetUserOnlineAddrList(to)
+// 	if err != nil {
+// 		return ERR_DB
+// 	}
 
-	for _, addr := range addlist {
-		fmt.Println("SendMessageToUserOnline to ", to, " serveraddr ", addr)
+// 	for _, addr := range addlist {
+// 		fmt.Println("SendMessageToUserOnline to ", to, " serveraddr ", addr)
 
-		if addr == srvconfig.ServerAddr {
-			//如果该用户在这台服务器也有登录，则直接转发
-			SendMsgToId(to, data)
-		} else {
-			err = dbMgr.SendMsgToServer(append(Bytes(to), data...), addr)
-			if err != nil {
-				return ERR_DB
+// 		if addr == srvconfig.ServerAddr {
+// 			//如果该用户在这台服务器也有登录，则直接转发
+// 			SendMsgToId(to, data)
+// 		} else {
+// 			err = dbMgr.SendMsgToServer(append(Bytes(to), data...), addr)
+// 			if err != nil {
+// 				return ERR_DB
+// 			}
+// 		}
+// 	}
+
+// 	return ERR_NONE
+// }
+
+// func SendMessageToUserOffline(to uint64, data []byte) uint16 {
+// 	err := dbMgr.SendMsgToUserOffline(to, data)
+// 	if err != nil {
+// 		return ERR_DB
+// 	}
+// 	return ERR_NONE
+// }
+
+func SendMessageToSelfExceptMe(sess ISession, data []byte) uint16 {
+	sesslist, ok := sessMap[sess.ID()]
+	var err error
+
+	if ok {
+		for _, tsess := range sesslist {
+			if tsess == sess {
+				continue
 			}
+			tsess.Send(data)
 		}
 	}
 
-	return ERR_NONE
-}
+	olinfo, ok := userOLMapAll[sess.ID()]
+	if ok {
+		for saddr, _ := range olinfo {
+			if len(saddr) != 0 {
+				//on other server
+				msg := &SMsgUserMessage{}
+				msg.MsgId = SMsgId_UserMessage
+				msg.Uid = sess.ID()
+				msg.Data = data
 
-func SendMessageToUserOffline(to uint64, data []byte) uint16 {
-	err := dbMgr.SendMsgToUserOffline(to, data)
-	if err != nil {
-		return ERR_DB
+				fmt.Println("SendMessageToSelfExceptMe send msg to server ", saddr, " to ", sess.ID())
+				err = dbMgr.SendMsgToServer(Bytes(msg), saddr)
+				if err != nil {
+					return ERR_DB
+				}
+			}
+		}
 	}
 	return ERR_NONE
 }
@@ -83,7 +117,7 @@ func SendMessageToUser(to uint64, data []byte) uint16 {
 		for saddr, _ := range olinfo {
 			if len(saddr) == 0 {
 				//on local server
-				fmt.Println("send msg to local server to ", to)
+				fmt.Println("SendMessageToUser send msg to local server to ", to)
 				SendMsgToId(to, data)
 			} else {
 				//on other server
@@ -93,7 +127,7 @@ func SendMessageToUser(to uint64, data []byte) uint16 {
 				msg.Data = data //append(Bytes(who), msgbytes...)
 				// senddata = append(senddata, Bytes(platform)...)
 				// senddata = append(senddata, msgbytes...)
-				fmt.Println("send msg to server ", saddr, " to ", to)
+				fmt.Println("SendMessageToUser send msg to server ", saddr, " to ", to)
 				err = dbMgr.SendMsgToServer(Bytes(msg), saddr)
 				if err != nil {
 					return ERR_DB
@@ -121,7 +155,6 @@ func SendMessageToUser(to uint64, data []byte) uint16 {
 }
 
 func SendMessageToFriendsOnline(id uint64, data []byte) uint16 {
-
 	friendinfolist, err := dbMgr.GetFriendOnlineList(id)
 	if err != nil {
 		return ERR_DB
@@ -415,21 +448,19 @@ func HandlerMessage(sess ISession, data []byte) (uint16, interface{}) {
 		return ERR_INVALID_JSON, ERR_INVALID_JSON
 	}
 
-	who := msg.Who
-
-	if who == sess.ID() {
+	if msg.To == sess.ID() {
 		return ERR_MESSAGE_SELF, ERR_MESSAGE_SELF
 	}
 
 	msg.TimeStamp = time.Now().Unix()
-	msg.Who = sess.ID()
+	msg.From = sess.ID()
 	msg.Nickname = sess.NickName()
 
 	//msg := &MsgMessage{Who: sess.ID(), TimeStamp: timestamp, Message: message}
 
 	errcode := ERR_NONE
 
-	flag, err := dbMgr.IsAppDataExists(who)
+	flag, err := dbMgr.IsAppDataExists(msg.To)
 
 	if err != nil {
 		errcode = ERR_DB
@@ -437,7 +468,7 @@ func HandlerMessage(sess ISession, data []byte) (uint16, interface{}) {
 		if !flag {
 			errcode = ERR_APPDATAID_NOT_EXISTS
 		} else {
-			flag, err = isInBlack(sess.ID(), who)
+			flag, err = isInBlack(sess.ID(), msg.To)
 			if err != nil {
 				errcode = ERR_DB
 			} else {
@@ -449,7 +480,8 @@ func HandlerMessage(sess ISession, data []byte) (uint16, interface{}) {
 						errcode = ERR_UNKNOWN
 					} else {
 						senddata := packageMsg(RetFrame, 0, MsgId_Message, msgbytes)
-						errcode = SendMessageToUser(who, senddata)
+						errcode = SendMessageToUser(msg.To, senddata)
+						errcode = SendMessageToSelfExceptMe(sess, senddata)
 					}
 				}
 			}

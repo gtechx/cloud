@@ -9,10 +9,27 @@ func serverMonitorStart() {
 }
 
 func startServerMonitor() {
-	timer := time.NewTimer(time.Second * 30)
+	for {
+		timer := time.NewTimer(time.Second * 1)
 
-	select {
-	case <-timer.C:
-		dbMgr.CheckChatServerTTL()
+		select {
+		case <-timer.C:
+			checkAllServerAlive()
+		}
+	}
+}
+
+func checkAllServerAlive() {
+	serverlist, err := dbMgr.GetChatServerList()
+	if err == nil {
+		for _, serveraddr := range serverlist {
+			flag, err := dbMgr.IsChatServerAlive(serveraddr)
+			if err != nil {
+				continue
+			}
+			if !flag {
+				dbMgr.UnRegisterChatServer(serveraddr)
+			}
+		}
 	}
 }

@@ -96,8 +96,8 @@ func (db *DBManager) GetFriendInfoList(id uint64, groupname string) ([]*FriendJs
 	friendlist := []*FriendJson{}
 
 	retdb := db.sql.Table(tblprefix+"friend a").Where("a.dataid = ?", id).Where("a.groupname = ?", groupname)
-	retdb = retdb.Joins("join " + tblprefix + "app_data b on a.dataid = b.id").Where("(SELECT count(1) FROM " + tblprefix + "black c where a.otherdataid = c.otherdataid) = 0")
-	retdb = retdb.Select("a.otherdataid as dataid, a.groupname, a.comment, b.nickname, b.desc").Find(&friendlist)
+	retdb = retdb.Joins("join " + tblprefix + "app_data b on a.otherdataid = b.id").Where("(SELECT count(1) FROM " + tblprefix + "black c where a.otherdataid = c.otherdataid) = 0")
+	retdb = retdb.Select("a.otherdataid as uid, a.groupname, a.comment, b.nickname, b.desc").Find(&friendlist)
 
 	return friendlist, retdb.Error
 }
