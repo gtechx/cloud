@@ -608,17 +608,48 @@ type MsgRetRoomUserList struct {
 //message broadcast
 
 //公共频道消息传输，如世界、国家等
-const MsgId_PublicChannelMessage uint16 = 1200
+const MsgId_ZonePublicMessage uint16 = 1200
 
-type MsgPublicChannelMessage struct {
-	Who       uint64 `json:"who,string"` //使用who，表示客户端填充的接收者，服务器转发时会修改为发送者
+type MsgZonePublicMessage struct {
+	From      uint64 `json:"from,string"`
+	TimeStamp int64  `json:"timestamp,string"`
+	Nickname  string `json:"nickname"`
+	Message   string `json:"message"`
+	Channel   string `json:"channel"`
+	Appname   string `json:"appname,omitempty"`
+	Zonename  string `json:"zonename,omitempty"`
+}
+
+type MsgZonePublicMessageReceipt struct {
+	ErrorCode uint16
+}
+
+const MsgId_AppPublicMessage uint16 = 1205
+
+type MsgAppPublicMessage struct {
+	From      uint64 `json:"from,string"`
+	TimeStamp int64  `json:"timestamp,string"`
+	Nickname  string `json:"nickname"`
+	Message   string `json:"message"`
+	Channel   string `json:"channel"`
+	Appname   string `json:"appname,omitempty"`
+}
+
+type MsgAppPublicMessageReceipt struct {
+	ErrorCode uint16
+}
+
+const MsgId_ServerPublicMessage uint16 = 1210
+
+type MsgServerPublicMessage struct {
+	From      uint64 `json:"from,string"`
 	TimeStamp int64  `json:"timestamp,string"`
 	Nickname  string `json:"nickname"`
 	Message   string `json:"message"`
 	Channel   string `json:"channel"`
 }
 
-type MsgPublicChannelMessageReceipt struct {
+type MsgServerPublicMessageReceipt struct {
 	ErrorCode uint16
 }
 
@@ -693,13 +724,28 @@ type SMsgRoomMessage struct {
 	Data []byte `json:"data"`
 }
 
-const SMsgId_PublicMessage uint16 = 20010
+const SMsgId_ZonePublicMessage uint16 = 20010
 
-type SMsgPublicMessage struct {
+type SMsgZonePublicMessage struct {
 	SMsg
 	Appname  string `json:"appname"`
 	Zonename string `json:"zonename"`
-	Data     []byte `json:"data"`
+	Data     []byte `json:"data,string"`
+}
+
+const SMsgId_AppPublicMessage uint16 = 20015
+
+type SMsgAppPublicMessage struct {
+	SMsg
+	Appname string `json:"appname"`
+	Data    []byte `json:"data,string"`
+}
+
+const SMsgId_ServerPublicMessage uint16 = 20020
+
+type SMsgServerPublicMessage struct {
+	SMsg
+	Data []byte `json:"data,string"`
 }
 
 //server internal msg end

@@ -23,9 +23,9 @@ var quit chan os.Signal
 //var userOLMapAll = map[uint64]map[string]string{} //{uid1:{ios:serveraddr, pc:serveraddr}}
 var userOLMapAll = map[uint64]map[string]bool{} //{uid1:{serveraddr1:true, serveraddr2:true}} //所有服登录用户
 
-var sessMap = map[uint64]map[string]ISession{}  //{uid:{web:sess, ios:sess, android:sess}} //本地登录用户
-var roomMapLocal = map[uint64]map[uint64]bool{} //{rid:{uid1:true, uid2:true}} //本地登录用户所在房间
-//var userOLAppZoneMapLocal = map[string]map[string]map[uint64]bool{} //{appname:{zonename:{uid1:true, uid2:true}}}
+var sessMap = map[uint64]map[string]ISession{}              //{uid:{web:sess, ios:sess, android:sess}} //本地登录用户
+var roomMapLocal = map[uint64]map[uint64]bool{}             //{rid:{uid1:true, uid2:true}} //本地登录用户所在房间 //need optimize
+var uidMapAppZone = map[string]map[string]map[uint64]bool{} //{appname:{zonename:{uid1:true, uid2:true}}}
 
 type ConnData struct {
 	conn        net.Conn
@@ -145,14 +145,7 @@ func main() {
 		}
 		for _, iuid := range users {
 			uid := Uint64(iuid)
-			olinfo, ok := userOLMapAll[uid]
-
-			if !ok {
-				olinfo = map[string]bool{}
-				userOLMapAll[uid] = olinfo
-			}
-
-			olinfo[serveraddr] = true
+			addOLUser(serveraddr, uid)
 		}
 	}
 
@@ -182,6 +175,41 @@ func main() {
 	dbMgr.UnInitialize()
 	// var str string
 	// fmt.Scanln(&str)
+}
+
+func addAppZoneUid(appname, zonename string, uid uint64) {
+	zonemap, ok := uidMapAppZone[appname]
+	if !ok {
+		zonemap = map[string]map[uint64]bool{}
+		uidMapAppZone[appname] = zonemap
+	}
+
+	sessmap, ok := zonemap[zonename]
+
+	if !ok {
+		sessmap = map[uint64]bool{}
+		zonemap[zonename] = sessmap
+	}
+	sessmap[uid] = true
+}
+
+func removeAppZoneUid(appname, zonename string, uid uint64) {
+	zonemap, ok := uidMapAppZone[appname]
+	if ok {
+		sessmap, ok := zonemap[zonename]
+
+		if ok {
+			delete(sessmap, uid)
+
+			if len(sessmap) == 0 {
+				delete(zonemap, zonename)
+
+				if len(zonemap) == 0 {
+					delete(uidMapAppZone, appname)
+				}
+			}
+		}
+	}
 }
 
 func addOLUser(serveraddr string, uid uint64) {
@@ -217,6 +245,25 @@ func broadcastServerEvent(msgbytes []byte) error {
 			continue
 		}
 		err = dbMgr.SendServerEvent(serveraddr, msgbytes)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func broadcastServerMsg(msgbytes []byte) error {
+	serverlist, err := dbMgr.GetChatServerList()
+	if err != nil {
+		return err
+	}
+
+	for _, serveraddr := range serverlist {
+		if serveraddr == srvconfig.ServerAddr {
+			continue
+		}
+		err = dbMgr.SendMsgToServer(serveraddr, msgbytes)
 		if err != nil {
 			return err
 		}
@@ -278,7 +325,8 @@ func loop() {
 						}
 
 						for _, user := range users {
-							userlist[user.Dataid] = true
+							_, ok := userOLMapAll[user.Dataid]
+							userlist[user.Dataid] = ok
 						}
 					}
 				}
@@ -301,6 +349,8 @@ func loop() {
 					sess.Stop()
 					continue
 				}
+
+				addAppZoneUid(conndata.tbl_appdata.Appname, conndata.tbl_appdata.Zonename, conndata.tbl_appdata.ID)
 			}
 
 			limitcount++
@@ -386,12 +436,26 @@ func loop() {
 			case SMsgId_RoomMessage:
 				rid := Uint64(data)
 				SendMsgToLocalRoom(rid, data[8:])
-			case SMsgId_PublicMessage:
+			case SMsgId_ZonePublicMessage:
+				len := int(data[0])
+				appname := String(data[1 : 1+len])
+				data = data[1+len:]
+				len = int(data[0])
+				zonename := String(data[1 : 1+len])
+				data = data[1+len:]
+				SendZonePublicMsg(appname, zonename, data)
+			case SMsgId_AppPublicMessage:
+				len := int(data[0])
+				appname := String(data[1 : 1+len])
+				data = data[1+len:]
+				SendAppPublicMsg(appname, data)
+			case SMsgId_ServerPublicMessage:
+				SendServerPublicMsg(data)
 			}
 
 			limitcount++
 
-			if limitcount >= 100 {
+			if limitcount >= 10 {
 				break
 			}
 		}
@@ -470,6 +534,8 @@ func loop() {
 					}
 
 					dbMgr.RemoveOnlineUser(srvconfig.ServerAddr, sess.ID())
+
+					removeAppZoneUid(sess.AppName(), sess.ZoneName(), sess.ID())
 				}
 			}
 

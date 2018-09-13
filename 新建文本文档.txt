@@ -19,15 +19,22 @@ c.Ã¿¸ö·þÎñÆ÷»áÎ¬»¤Ò»¸öttl:serveraddrµÄkeyÔÚredisÖÐ£¬Í¬Ê±¸ÃkeyµÄ´æ»îÒ²´ú±íÁË¶ÔÓ¦·
 ÁÄÌì·þÎñÆ÷Ö®¼äÏûÏ¢¶¨Òå£º
 
 µ¥¶Ôµ¥ÏûÏ¢·¢ËÍ£º
+a.²»»áÁ¢¼´½«ÏûÏ¢ÍÆËÍ¸ø¶Ô·½£¬¶øÊÇ·¢ËÍÒ»¸öÊÕµ½ÐÂÏûÏ¢µÄÌáÊ¾£¬²¢½«ÏûÏ¢´æ´¢ÓÚ¶Ô·½µÄÏûÏ¢¶ÓÁÐÖÐ¡£
+b.¶Ô·½ÊÕµ½ÐÂÏûÏ¢ÌáÊ¾ÒÔºó£¬¿ÉÒÔÑ¡ÔñÊÇ·ñÈ¥À­È¡¶ÔÓ¦µÄÏûÏ¢¡£À­È¡¹ýµÄÏûÏ¢ÊÇ·ñÉ¾³ýÄØ£¿
+c.Èç¹û¶Ô·½ÀëÏß£¿
+d.Èç¹û¶Ô·½·ÇºÃÓÑ£¿
+e.Èç¹ûÔÚºÚÃûµ¥£¬Ôò·µ»ØºÚÃûµ¥´íÎó¡£
 
 ·¿¼äÏûÏ¢·¢ËÍ£º
 client->server->redis->otherserver->otherclient
 ÓÉÁ½²¿·Ö×é³É
 a.·¢ËÍ¸ø±¾µØ·¿¼äÄÚµÄÓÃ»§
 b.·¢ËÍ¸øÆäËû·þÎñÆ÷ÉÏµÄ·¿¼äÄÚÓÃ»§
+·þÎñÆ÷´æ´¢3ÌìÒÔÄÚµÄ·¿¼äÏûÏ¢¼ÇÂ¼
 
 ¹«¹²ÏûÏ¢·¢ËÍ£º
 client->server->redis->otherserver->otherclient
+ÕâÀàÏûÏ¢·þÎñÆ÷²»»á×ö´æ´¢£¬ÐèÒªÁ¢¼´ÍÆËÍ
 
 ¹ØÓÚ¿ìËÙÏòÈ«·þËùÓÐuser·¢ËÍÏûÏ¢£º
 1.Ê×ÏÈÃ¿¸ö·þÎñÆ÷¶¼Òª±£´æµ±Ç°ËùµÇÂ¼µÄappºÍ·ÖÇøÄÚËùÓÐµÄÓÃ»§idºÍ·þÎñÆ÷ÐÅÏ¢£¬ÄÇÃ´ÔõÑùµÃµ½ÕâÐ©ÐÅÏ¢ÄØ£¿

@@ -403,27 +403,31 @@ func HandlerRoomMessage(sess ISession, data []byte) (uint16, interface{}) {
 
 func SendMsgToRoom(rid uint64, msgbytes []byte) (uint16, uint16) {
 	senddata := packageMsg(RetFrame, 0, MsgId_RoomMessage, msgbytes)
-	serverlist, err := dbMgr.GetChatServerList()
-	if err != nil {
-		return ERR_DB, ERR_DB
-	}
+	// serverlist, err := dbMgr.GetChatServerList()
+	// if err != nil {
+	// 	return ERR_DB, ERR_DB
+	// }
 
 	msg := &SMsgRoomMessage{}
 	msg.MsgId = SMsgId_RoomMessage
 	msg.Rid = rid
 	msg.Data = senddata //append(Bytes(who), msgbytes...)
-	for _, serveraddr := range serverlist {
-		if serveraddr == srvconfig.ServerAddr {
-			continue
-		}
-		//broadcast to other servers
-		err = dbMgr.SendMsgToServer(Bytes(msg), serveraddr)
-		if err != nil {
-			return ERR_DB, ERR_DB
-		}
+	// for _, serveraddr := range serverlist {
+	// 	if serveraddr == srvconfig.ServerAddr {
+	// 		continue
+	// 	}
+	// 	//broadcast to other servers
+	// 	err = dbMgr.SendMsgToServer(Bytes(msg), serveraddr)
+	// 	if err != nil {
+	// 		return ERR_DB, ERR_DB
+	// 	}
+	// }
+	err := broadcastServerMsg(Bytes(msg))
+	if err != nil {
+		return ERR_DB, ERR_DB
 	}
 
-	//send to use on local server
+	//send to use on local server and offline users in room
 	SendMsgToLocalRoom(rid, senddata)
 	return ERR_NONE, ERR_NONE
 }
