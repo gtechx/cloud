@@ -11,13 +11,10 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/gtechx/base/collections"
 	. "github.com/gtechx/base/common"
-	//"github.com/gtechx/base/gtnet"
-
 	"github.com/gtechx/base/gtnet"
 )
 
@@ -82,7 +79,7 @@ var configpath string = "../res/config/chatserver.config"
 
 func main() {
 	quit = make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGILL, syscall.SIGTRAP, syscall.SIGABRT, syscall.SIGBUS, syscall.SIGFPE, syscall.SIGSEGV, syscall.SIGPIPE, syscall.SIGALRM)
+	signal.Notify(quit, os.Interrupt, os.Kill)
 
 	pconfig := flag.String("config", "", "-config=")
 
@@ -209,6 +206,25 @@ func removeOLUser(serveraddr string, uid uint64) {
 	}
 }
 
+func broadcastServerEvent(msgbytes []byte) error {
+	serverlist, err := dbMgr.GetChatServerList()
+	if err != nil {
+		return err
+	}
+
+	for _, serveraddr := range serverlist {
+		if serveraddr == srvconfig.ServerAddr {
+			continue
+		}
+		err = dbMgr.SendServerEvent(serveraddr, msgbytes)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func loop() {
 	for {
 		//check quit
@@ -268,26 +284,14 @@ func loop() {
 				}
 
 				//send event to other server
-				serverlist, err := dbMgr.GetChatServerList()
-				if err != nil {
-					fmt.Println(err.Error())
-					sess.Stop()
-					continue
-				}
-
 				msg := &SMsgUserOnline{Uid: conndata.tbl_appdata.ID, ServerAddr: srvconfig.ServerAddr}
 				msg.MsgId = SMsgId_UserOnline
 				msgbytes := Bytes(msg)
-				fmt.Println("cur serverlist:", serverlist)
-				for _, serveraddr := range serverlist {
-					if serveraddr == srvconfig.ServerAddr {
-						continue
-					}
-					err = dbMgr.SendServerEvent(serveraddr, msgbytes)
-					if err != nil {
-						fmt.Println(err.Error())
-						break
-					}
+
+				if broadcastServerEvent(msgbytes) != nil {
+					fmt.Println(err.Error())
+					sess.Stop()
+					continue
 				}
 			}
 
@@ -454,22 +458,13 @@ func loop() {
 					}
 
 					//send event to other server
-					serverlist, err := dbMgr.GetChatServerList()
-					if err != nil {
-						continue
-					}
-
 					msg := &SMsgUserOffline{Uid: sess.ID(), ServerAddr: srvconfig.ServerAddr}
 					msg.MsgId = SMsgId_UserOffline
 					msgbytes := Bytes(msg)
-					for _, serveraddr := range serverlist {
-						if serveraddr == srvconfig.ServerAddr {
-							continue
-						}
-						err = dbMgr.SendServerEvent(serveraddr, msgbytes)
-						if err != nil {
-							break
-						}
+
+					if broadcastServerEvent(msgbytes) != nil {
+						fmt.Println(err.Error())
+						continue
 					}
 
 					dbMgr.RemoveOnlineUser(srvconfig.ServerAddr, sess.ID())

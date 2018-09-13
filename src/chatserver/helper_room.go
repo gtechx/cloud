@@ -3,8 +3,9 @@ package main
 import (
 	"encoding/json"
 
-	//. "github.com/gtechx/base/common"
 	"gtdb"
+
+	. "github.com/gtechx/base/common"
 )
 
 //所有这类函数，返回false表示出错
@@ -24,6 +25,15 @@ func createRoom(appdataid uint64, roommsg *MsgReqCreateRoom, perrcode *uint16) b
 func deleteRoom(rid uint64, perrcode *uint16) bool {
 	err := dbMgr.DeleteRoom(rid)
 	if err != nil {
+		*perrcode = ERR_DB
+		return false
+	}
+
+	msg := &SMsgRoomDimiss{Rid: rid}
+	msg.MsgId = SMsgId_RoomDimiss
+	msgbytes := Bytes(msg)
+
+	if broadcastServerEvent(msgbytes) != nil {
 		*perrcode = ERR_DB
 		return false
 	}
@@ -100,6 +110,15 @@ func addRoomUser(rid, appdataid uint64, presence *MsgRoomPresence, perrcode *uin
 	if err != nil {
 		*perrcode = ERR_DB
 	} else {
+		msg := &SMsgRoomAddUser{Rid: rid, Uid: appdataid}
+		msg.MsgId = SMsgId_RoomAddUser
+		msgbytes := Bytes(msg)
+
+		if broadcastServerEvent(msgbytes) != nil {
+			*perrcode = ERR_DB
+			return false
+		}
+
 		presencebytes, err := json.Marshal(presence)
 		if err != nil {
 			*perrcode = ERR_INVALID_JSON
@@ -257,6 +276,15 @@ func unjinyanRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
 func removeRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
 	err := dbMgr.RemoveRoomUser(rid, appdataid)
 	if err != nil {
+		*perrcode = ERR_DB
+		return false
+	}
+
+	msg := &SMsgRoomRemoveUser{Rid: rid, Uid: appdataid}
+	msg.MsgId = SMsgId_RoomRemoveUser
+	msgbytes := Bytes(msg)
+
+	if broadcastServerEvent(msgbytes) != nil {
 		*perrcode = ERR_DB
 		return false
 	}
