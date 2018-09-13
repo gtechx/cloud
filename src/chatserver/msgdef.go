@@ -670,6 +670,12 @@ type SMsgRoomDimiss struct {
 	Rid uint64 `json:"rid"`
 }
 
+const SMsgId_ServerQuit uint16 = 10025
+
+type SMsgServerQuit struct {
+	SMsg
+}
+
 //*********message*************
 const SMsgId_UserMessage uint16 = 20000
 

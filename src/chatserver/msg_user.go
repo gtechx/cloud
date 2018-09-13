@@ -55,7 +55,7 @@ func HandlerReqUserData(sess ISession, data []byte) (uint16, interface{}) {
 
 // 		if addr == srvconfig.ServerAddr {
 // 			//如果该用户在这台服务器也有登录，则直接转发
-// 			SendMsgToId(to, data)
+// 			SendMsgToLocalUid(to, data)
 // 		} else {
 // 			err = dbMgr.SendMsgToServer(append(Bytes(to), data...), addr)
 // 			if err != nil {
@@ -118,7 +118,7 @@ func SendMessageToUser(to uint64, data []byte) uint16 {
 			if len(saddr) == 0 {
 				//on local server
 				fmt.Println("SendMessageToUser send msg to local server to ", to)
-				SendMsgToId(to, data)
+				SendMsgToLocalUid(to, data)
 			} else {
 				//on other server
 				msg := &SMsgUserMessage{}

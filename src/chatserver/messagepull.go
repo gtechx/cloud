@@ -28,7 +28,7 @@ func startMessagePull() {
 		// msg := &ServerMsg{Uid: uid, Data: data[8:]}
 		serverMsgQueue.Put(msg)
 		fmt.Println("put msg ", msgid, " data ", string(data[2:]))
-		// if !SendMsgToId(id, data[8:]) {
+		// if !SendMsgToLocalUid(id, data[8:]) {
 		// 	dbMgr.SendMsgToUserOffline(id, data[8:])
 		// }
 	}

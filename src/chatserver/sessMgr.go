@@ -45,7 +45,7 @@ func GetSess(id uint64) map[string]ISession {
 	return nil
 }
 
-func SendMsgToId(id uint64, msg []byte) bool {
+func SendMsgToLocalUid(id uint64, msg []byte) bool {
 	sesslist := GetSess(id)
 	if sesslist != nil {
 		flag := false

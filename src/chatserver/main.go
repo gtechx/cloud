@@ -170,7 +170,7 @@ func main() {
 	fmt.Println(srvconfig.ServerNet + " server start on addr " + srvconfig.ServerAddr + " ok...")
 
 	//frame loop
-	loop()
+	go loop()
 
 	<-quit
 
@@ -323,6 +323,8 @@ func loop() {
 			data := event.Data
 			fmt.Println("processing server event msgid " + String(event.Msgid))
 			switch event.Msgid {
+			case SMsgId_ServerQuit:
+				isQuit = true
 			case SMsgId_UserOnline:
 				uid := Uint64(data)
 				serveraddr := String(data[8:])
@@ -380,7 +382,7 @@ func loop() {
 			switch msg.Msgid {
 			case SMsgId_UserMessage:
 				uid := Uint64(data)
-				SendMsgToId(uid, data[8:])
+				SendMsgToLocalUid(uid, data[8:])
 			case SMsgId_RoomMessage:
 				rid := Uint64(data)
 				SendMsgToLocalRoom(rid, data[8:])
