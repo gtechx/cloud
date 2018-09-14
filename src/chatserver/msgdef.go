@@ -84,6 +84,20 @@ func (i myint) UnMarshal(buff []byte) int {
 	return 0
 }
 
+const MsgId_Notify uint16 = 900
+
+type MsgNotify struct {
+	Type string `json:"type"` //single msg, room msg, single presence, room presence
+	When string `json:"when"`
+	Data string `json:"data"` //single msg:{from:uid, to:uid}, room msg:{from:uid, to:rid}, single presence:{type:type, from:uid, to:uid}, room presence:{type:type, from:uid, to:rid}
+}
+
+// type MsgRetLogin struct {
+// 	//Flag      bool
+// 	ErrorCode uint16
+// 	Token     []byte
+// }
+
 const MsgId_ReqLogin uint16 = 1000
 
 type MsgReqLogin struct {

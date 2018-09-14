@@ -31,6 +31,7 @@ client->server->redis->otherserver->otherclient
 a.发送给本地房间内的用户
 b.发送给其他服务器上的房间内用户
 服务器存储3天以内的房间消息记录
+a.server接收房间用户发送的消息，1.发送给本服务器上该房间在线用户 2.存储到房间消息列表中 3.发送到redis其它服务器消息队列中，以供其它服务器发送给房间在线用户
 
 公共消息发送：
 client->server->redis->otherserver->otherclient

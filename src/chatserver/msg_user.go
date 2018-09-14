@@ -99,7 +99,7 @@ func SendMessageToSelfExceptMe(sess ISession, data []byte) uint16 {
 				msg.Data = data
 
 				fmt.Println("SendMessageToSelfExceptMe send msg to server ", saddr, " to ", sess.ID())
-				err = dbMgr.SendMsgToServer(Bytes(msg), saddr)
+				err = dbMgr.SendMsgToServer(saddr, Bytes(msg))
 				if err != nil {
 					return ERR_DB
 				}
@@ -128,7 +128,7 @@ func SendMessageToUser(to uint64, data []byte) uint16 {
 				// senddata = append(senddata, Bytes(platform)...)
 				// senddata = append(senddata, msgbytes...)
 				fmt.Println("SendMessageToUser send msg to server ", saddr, " to ", to)
-				err = dbMgr.SendMsgToServer(Bytes(msg), saddr)
+				err = dbMgr.SendMsgToServer(saddr, Bytes(msg))
 				if err != nil {
 					return ERR_DB
 				}
@@ -161,7 +161,7 @@ func SendMessageToFriendsOnline(id uint64, data []byte) uint16 {
 	}
 
 	for _, online := range friendinfolist {
-		err = dbMgr.SendMsgToServer(append(Bytes(online.Dataid), data...), online.Serveraddr)
+		err = dbMgr.SendMsgToServer(online.Serveraddr, append(Bytes(online.Dataid), data...))
 		if err != nil {
 			return ERR_DB
 		}

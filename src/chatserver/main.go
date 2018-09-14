@@ -318,17 +318,17 @@ func loop() {
 						userlist = map[uint64]bool{}
 						roomMapLocal[room.Rid] = userlist
 
-						users, err := dbMgr.GetRoomUserIds(room.Rid)
+						// users, err := dbMgr.GetRoomUserIds(room.Rid)
 
-						if err != nil {
-							continue
-						}
+						// if err != nil {
+						// 	continue
+						// }
 
-						for _, user := range users {
-							_, ok := userOLMapAll[user.Dataid]
-							userlist[user.Dataid] = ok
-						}
+						// for _, user := range users {
+						// 	userlist[user.Dataid] = true
+						// }
 					}
+					userlist[conndata.tbl_appdata.ID] = true
 				}
 
 				//send event to other server
@@ -506,18 +506,19 @@ func loop() {
 					for _, room := range roomlist {
 						userlist, ok := roomMapLocal[room.Rid]
 						if ok {
-							flag := true
-							//check if has room use still on this server
-							for uid, _ := range userlist {
-								//_, ok := userOLMapAll[uid]
-								_, ok := sessMap[uid]
-								if ok {
-									flag = false
-									break
-								}
-							}
+							delete(userlist, sess.ID())
+							// flag := true
+							// //check if has room use still on this server
+							// for uid, _ := range userlist {
+							// 	//_, ok := userOLMapAll[uid]
+							// 	_, ok := sessMap[uid]
+							// 	if ok {
+							// 		flag = false
+							// 		break
+							// 	}
+							// }
 
-							if flag {
+							if len(userlist) == 0 {
 								delete(roomMapLocal, room.Rid)
 							}
 						}

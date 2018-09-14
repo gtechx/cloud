@@ -124,7 +124,7 @@ func (db *DBManager) GetOfflineMessage(id uint64) ([][]byte, error) {
 	// return msglist, err
 }
 
-func (db *DBManager) SendMsgToServer(msg []byte, serveraddr string) error {
+func (db *DBManager) SendMsgToServer(serveraddr string, msg []byte) error {
 	conn := db.rd.Get()
 	defer conn.Close()
 	_, err := conn.Do("RPUSH", "message:"+serveraddr, msg)
@@ -135,6 +135,13 @@ func (db *DBManager) SendMsgToUserOffline(to uint64, data []byte) error {
 	conn := db.rd.Get()
 	defer conn.Close()
 	_, err := conn.Do("RPUSH", "message:offline:"+String(to), data)
+	return err
+}
+
+func (db *DBManager) AddRoomMsg(rid uint64, msg []byte) error {
+	conn := db.rd.Get()
+	defer conn.Close()
+	_, err := conn.Do("ZADD", "room:message:"+String(rid), msg)
 	return err
 }
 

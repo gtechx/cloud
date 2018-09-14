@@ -67,17 +67,13 @@ func SendMsgByPlatform(id uint64, platform string, msg []byte) {
 func SendMsgToLocalRoom(rid uint64, msg []byte) {
 	roomusers, ok := roomMapLocal[rid]
 	if ok {
-		for uid, isol := range roomusers {
-			if isol {
-				sesslist, ok := sessMap[uid]
+		for uid, _ := range roomusers {
+			sesslist, ok := sessMap[uid]
 
-				if ok {
-					for _, sess := range sesslist {
-						sess.Send(msg)
-					}
+			if ok {
+				for _, sess := range sesslist {
+					sess.Send(msg)
 				}
-			} else {
-				dbMgr.SendMsgToUserOffline(uid, msg)
 			}
 		}
 	}
