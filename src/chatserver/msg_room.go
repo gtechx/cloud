@@ -397,6 +397,16 @@ func HandlerRoomMessage(sess ISession, data []byte) (uint16, interface{}) {
 
 	// senddata = append(senddata, Bytes(platform)...)
 	// senddata = append(senddata, msgbytes...)
+	timstamp := time.Now().UnixNano()
+	err := dbMgr.AddRoomMsg(roommsg.Rid, msgbytes, timstamp)
+	if err != nil {
+		return ERR_DB, ERR_DB
+	}
+
+	err = dbMgr.SetRoomLastMsgTime(roommsg.Rid, timstamp)
+	if err != nil {
+		return ERR_DB, ERR_DB
+	}
 
 	return SendMsgToRoom(roommsg.Rid, msgbytes)
 }

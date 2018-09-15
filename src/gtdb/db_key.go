@@ -508,11 +508,12 @@ type Room struct {
 	Roomname string `redis:"roomname" json:"roomname"`
 	Roomtype byte   `redis:"roomtype" json:"roomtype" gorm:"default:1"`
 	//Jointype  byte      `redis:"jointype" json:"jointype" gorm:"default:1"`
-	Jieshao   string    `redis:"jieshao" json:"jieshao"`
-	Notice    string    `redis:"notice" json:"notice"` //公告
-	Password  string    `redis:"password" json:"-"`
-	Maxuser   uint16    `redis:"maxuser" json:"maxuser" gorm:"default:500"`
-	CreatedAt time.Time `redis:"createdate" json:"createdate"`
+	Jieshao     string    `redis:"jieshao" json:"jieshao"`
+	Notice      string    `redis:"notice" json:"notice"` //公告
+	Password    string    `redis:"password" json:"-"`
+	Maxuser     uint16    `redis:"maxuser" json:"maxuser" gorm:"default:500"`
+	CreatedAt   time.Time `redis:"createdate" json:"createdate"`
+	Lastmsgtime int64     `redis:"lastmsgtime" json:"lastmsgtime,string"`
 
 	//other info for join
 	Msgsetting byte `redis:"msgsetting" json:"msgsetting" gorm:"-"` //RoomUser.Msgsetting

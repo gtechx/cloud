@@ -208,6 +208,11 @@ func (db *DBManager) GetRoomMsgSetting(rid, appdataid uint64) (byte, error) {
 }
 
 //room property
+func (db *DBManager) SetRoomLastMsgTime(rid uint64, timestamp int64) error {
+	retdb := db.sql.Model(room_table).Where("rid = ?", rid).Update("lastmsgtime", timestamp)
+	return retdb.Error
+}
+
 func (db *DBManager) SetRoomNotice(rid uint64, notice string) error {
 	retdb := db.sql.Model(room_table).Where("rid = ?", rid).Update("notice", notice)
 	return retdb.Error

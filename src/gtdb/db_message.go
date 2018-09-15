@@ -138,7 +138,7 @@ func (db *DBManager) SendMsgToUserOffline(to uint64, data []byte) error {
 	return err
 }
 
-func (db *DBManager) AddRoomMsg(rid uint64, msg []byte) error {
+func (db *DBManager) AddRoomMsg(rid uint64, msg []byte, timestamp int64) error {
 	conn := db.rd.Get()
 	defer conn.Close()
 	_, err := conn.Do("ZADD", "room:message:"+String(rid), msg)
