@@ -11,6 +11,9 @@
 //½øÈëÁÄÌì·¢ËÍappdataid, ·þÎñÆ÷¸ù¾Ýappdataid´´½¨session
 //¿Í»§¶Ë·¢ËÍ¿ÉÒÔ½ÓÊÜÏûÏ¢ÃüÁî£¬·þÎñÆ÷ÉèÖÃÍæ¼ÒÔÚÏß
 
+redis·Ö²¼Ê½´æ´¢£º
+a.Ã¿¸ö»ú·¿¶¼ÓÐÒ»¸öredis¼¯Èº£¬±£´æÁËÍêÕûµÄÁÄÌìÊý¾Ý¡£
+
 ÔÚÏßÓÃ»§´æ´¢ÒÔ¼°·þÎñÆ÷ËÀÍö´¦Àí£º
 a.ÔÚÏßÓÃ»§´æ´¢ÔÚonlineuser:serveraddr¶ÔÓ¦µÄsetÖÐ£¬²¢ÐèÒª¶ÔÓ¦·þÎñÆ÷Î¬³Ö¸ÃkeyµÄ´æ»î
 b.Ã¿¸ö·þÎñÆ÷ÐèÒª¶¨Ê±¼ì²éÆäËü·þÎñÆ÷µÄ´æ»îÇé¿ö£¬Ê×ÏÈ»ñÈ¡·þÎñÆ÷ÁÐ±í£¬È»ºó¼ì²éaÖÐµÄkeyÊÇ·ñ´æÔÚ¡£Èç¹û²»´æÔÚ£¬Ôò´Ó·þÎñÆ÷ÁÐ±íÖÐÒÆ³ý·þÎñÆ÷µØÖ·¡£
@@ -19,22 +22,18 @@ c.Ã¿¸ö·þÎñÆ÷»áÎ¬»¤Ò»¸öttl:serveraddrµÄkeyÔÚredisÖÐ£¬Í¬Ê±¸ÃkeyµÄ´æ»îÒ²´ú±íÁË¶ÔÓ¦·
 ÁÄÌì·þÎñÆ÷Ö®¼äÏûÏ¢¶¨Òå£º
 
 µ¥¶Ôµ¥ÏûÏ¢·¢ËÍ£º
-a.²»»áÁ¢¼´½«ÏûÏ¢ÍÆËÍ¸ø¶Ô·½£¬¶øÊÇ·¢ËÍÒ»¸öÊÕµ½ÐÂÏûÏ¢µÄÌáÊ¾£¬²¢½«ÏûÏ¢´æ´¢ÓÚ¶Ô·½µÄÏûÏ¢¶ÓÁÐÖÐ¡£
-b.¶Ô·½ÊÕµ½ÐÂÏûÏ¢ÌáÊ¾ÒÔºó£¬¿ÉÒÔÑ¡ÔñÊÇ·ñÈ¥À­È¡¶ÔÓ¦µÄÏûÏ¢¡£À­È¡¹ýµÄÏûÏ¢ÊÇ·ñÉ¾³ýÄØ£¿
-c.Èç¹û¶Ô·½ÀëÏß£¿
-d.Èç¹û¶Ô·½·ÇºÃÓÑ£¿
-e.Èç¹ûÔÚºÚÃûµ¥£¬Ôò·µ»ØºÚÃûµ¥´íÎó¡£
+a.Ä¿Ç°µÄ·¢ËÍ·½Ê½OK¡£
 
 ·¿¼äÏûÏ¢·¢ËÍ£º
-client->server->redis->otherserver->otherclient
+client->server->redis client->server->exchangeserver->otherserver->otherclient
 ÓÉÁ½²¿·Ö×é³É
 a.·¢ËÍ¸ø±¾µØ·¿¼äÄÚµÄÓÃ»§
 b.·¢ËÍ¸øÆäËû·þÎñÆ÷ÉÏµÄ·¿¼äÄÚÓÃ»§
 ·þÎñÆ÷´æ´¢3ÌìÒÔÄÚµÄ·¿¼äÏûÏ¢¼ÇÂ¼
-a.server½ÓÊÕ·¿¼äÓÃ»§·¢ËÍµÄÏûÏ¢£¬1.·¢ËÍ¸ø±¾·þÎñÆ÷ÉÏ¸Ã·¿¼äÔÚÏßÓÃ»§ 2.´æ´¢µ½·¿¼äÏûÏ¢ÁÐ±íÖÐ 3.·¢ËÍµ½redisÆäËü·þÎñÆ÷ÏûÏ¢¶ÓÁÐÖÐ£¬ÒÔ¹©ÆäËü·þÎñÆ÷·¢ËÍ¸ø·¿¼äÔÚÏßÓÃ»§
+a.server½ÓÊÕ·¿¼äÓÃ»§·¢ËÍµÄÏûÏ¢£¬1.·¢ËÍ¸ø±¾·þÎñÆ÷ÉÏ¸Ã·¿¼äÔÚÏßÓÃ»§ 2.´æ´¢µ½·¿¼äÏûÏ¢ÁÐ±íÖÐ 3.·¢ËÍ¸øexchangeserver·þÎñÆ÷£¬ÒÔ¹©·¢ËÍ¸øÆäËü·þÎñÆ÷·¿¼äÔÚÏßÓÃ»§
 
 ¹«¹²ÏûÏ¢·¢ËÍ£º
-client->server->redis->otherserver->otherclient
+client->server->exchangeserver->otherserver->otherclient
 ÕâÀàÏûÏ¢·þÎñÆ÷²»»á×ö´æ´¢£¬ÐèÒªÁ¢¼´ÍÆËÍ
 
 ¹ØÓÚ¿ìËÙÏòÈ«·þËùÓÐuser·¢ËÍÏûÏ¢£º
@@ -88,6 +87,14 @@ b.»ñÈ¡ºÃÓÑÁÐ±í¡¢·¿¼äÁÐ±í¡¢ÓÃ»§ÐÅÏ¢
 c.´«ÊäÁÄÌìÏûÏ¢£ºÓÃ»§¡¢·¿¼ä¡¢ÆµµÀ
 e.ÐÞ¸ÄÓÃ»§ÐÅÏ¢
 
+8.exchange·þÎñÆ÷×÷ÓÃ£¨ÐèÒªÊØ»¤½ø³Ì£©
+a.Á¬½Ó±¾µØËùÓÐÁÄÌì·þÎñÆ÷
+b.Á¬½ÓÆäËüexchange·þÎñÆ÷
+c.±¾µØexchange·þÎñÆ÷ºÍÁÄÌì·þÎñÆ÷´«µÝÏûÏ¢
+d.±¾µØexchange·þÎñÆ÷ºÍÆäËüexchange·þÎñÆ÷´«µÝÏûÏ¢
+//e.»ñÈ¡±¾µØÁÄÌì·þÎñÆ÷ÁÐ±í£¬¼à²âttl:serveraddrÊÇ·ñ´æ»î
+f.¸ù¾Ý±¾µØÁÄÌì·þÎñÆ÷µÄÁ¬½Ó´æ»îÇé¿ö£¬¸üÐÂlogin·þÎñÆ÷ÉÏµÄ·þÎñÆ÷ÁÐ±í
+
 8.ÕËºÅ¹ÜÀíÍøÕ¾×÷ÓÃ
 a.µÇÂ¼²¢»ñÈ¡ÕËºÅÐÅÏ¢
 b.¹ÜÀíÕËºÅappnameºÍzone
@@ -95,3 +102,5 @@ c.¹ÜÀíappnameÔÚÏßÓÃ»§
 d.×¢²áÕËºÅ
 e.¹ÜÀíappnameÓÃ»§Êý¾Ý
 f.¹ÜÀíµÚÈý·½·þÎñÆ÷µØÖ·
+
+¼ÙÈç1YÓÃ»§£¬Æ½¾ùÃ¿ÈË1000ÌõÏûÏ¢£¬Æ½¾ùÃ¿ÌõÏûÏ¢100×Ö½Ú¾ÍÊÇ100TÊý¾Ý£¬ÄÇÃ´100Ì¨redis£¬Æ½¾ùÃ¿Ì¨1TÊý¾Ý
