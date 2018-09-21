@@ -24,18 +24,26 @@ var loginServerAddChan = make(chan net.Conn, 1)
 var loginServerRemoveChan = make(chan net.Conn, 1)
 var loginServerMap = map[net.Conn]bool{}
 
-var chatServerAddChan = make(chan net.Conn, 1)
-var chatServerRemoveChan = make(chan net.Conn, 1)
-var chatServerMap = map[net.Conn]bool{}
+type ChatServer struct {
+	conn       net.Conn
+	serverAddr string
+}
+
+var chatServerAddChan = make(chan *ChatServer, 1)
+var chatServerRemoveChan = make(chan *ChatServer, 1)
+var chatServerMap = map[*ChatServer]int{}
 
 var newConnList = collections.NewSafeList()
 
 type Msg struct {
-	Msgid uint16
-	Data  []byte
+	Msgid     uint16
+	Data      []byte
+	Server    *ChatServer
+	LoginConn net.Conn
 }
 
 var chatServerMsgList = collections.NewSafeList()
+var loginServerMsgList = collections.NewSafeList()
 
 type serverconfig struct {
 	ServerAddr string `json:"serveraddr"`
@@ -137,10 +145,10 @@ func loop() {
 			loginServerMap[conn] = true
 		case conn := <-loginServerRemoveChan:
 			delete(loginServerMap, conn)
-		case conn := <-chatServerAddChan:
-			chatServerMap[conn] = true
-		case conn := <-chatServerRemoveChan:
-			delete(chatServerMap, conn)
+		case s := <-chatServerAddChan:
+			chatServerMap[s] = 0
+		case s := <-chatServerRemoveChan:
+			delete(chatServerMap, s)
 		default:
 		}
 
@@ -155,7 +163,74 @@ func loop() {
 			fmt.Println("processing chatserver msg msgid " + String(msg.Msgid))
 			switch msg.Msgid {
 			case SMsgId_UserOnline:
+				count := int(data[0])
+				chatServerMap[msg.Server] += count
+
+				//broadcast to other chat server of uid online
+				broadcastUserOnline(msg.Server, data[1:])
+				// uidcount := int(data[1])
+				// data = data[2:]
+				// for i := 0; i < uidcount; i++ {
+				// 	uid := Uint64(data[2:])
+
+				// 	data = data[8:]
+				// }
+			case SMsgId_UserOffline:
+				count := int(data[0])
+				chatServerMap[msg.Server] += count
+
+				//broadcast to other chat server of uid offline
+				broadcastUserOffline(msg.Server, data[1:])
+				// uidcount := int(data[1])
+				// data = data[2:]
+				// for i := 0; i < uidcount; i++ {
+				// 	uid := Uint64(data[2:])
+
+				// 	data = data[8:]
+				// }
 			}
+		}
+
+		for {
+			item, err := loginServerMsgList.Pop()
+			if err != nil {
+				break
+			}
+
+			msg := item.(*Msg)
+			data := msg.Data
+			fmt.Println("processing loginserver msg msgid " + String(msg.Msgid))
+			switch msg.Msgid {
+			case SMsgId_ReqChatServerList:
+				msg.LoginConn.Write(genChatServerList())
+			}
+		}
+	}
+}
+
+func genChatServerList() []byte {
+	serverlist := map[string]int{}
+	for s, ucount := range chatServerMap {
+		serverlist[s.serverAddr] = ucount
+	}
+	data, _ := json.Marshal(serverlist)
+	return data
+}
+
+func broadcastUserOnline(chatserver *ChatServer, data []byte) {
+	senddata := packageMsg(RetFrame, 0, SMsgId_UserOnline, data)
+	for s, ucount := range chatServerMap {
+		if chatserver != s {
+			s.conn.Write(senddata)
+		}
+	}
+}
+
+func broadcastUserOffline(chatserver *ChatServer, data []byte) {
+	senddata := packageMsg(RetFrame, 0, SMsgId_UserOnline, data)
+	for s, ucount := range chatServerMap {
+		if chatserver != s {
+			s.conn.Write(senddata)
 		}
 	}
 }

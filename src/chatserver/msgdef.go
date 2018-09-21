@@ -721,6 +721,17 @@ type SMsgServerQuit struct {
 	SMsg
 }
 
+const SMsgId_ReqChatServerList uint16 = 10030
+
+type SMsgReqChatServerList struct {
+	SMsg
+}
+
+type SMsgRetChatServerList struct {
+	SMsg
+	Json string
+}
+
 //*********message*************
 const SMsgId_UserMessage uint16 = 20000
 
