@@ -1,6 +1,7 @@
 package gtnet
 
 import (
+	"io"
 	"net"
 
 	"github.com/gtechx/base/pool"
@@ -17,7 +18,7 @@ import (
 // }
 
 type UdpClient struct {
-	parser   IDataParser
+	parser   func(io.Reader) error
 	listener IConnListener
 
 	recvChan chan []byte
@@ -62,7 +63,7 @@ func (this *UdpClient) LocalAddr() string {
 	return this.conn.LocalAddr().String()
 }
 
-func (this *UdpClient) SetDataParser(parser IDataParser) {
+func (this *UdpClient) SetDataParser(parser func(io.Reader) error) {
 	this.parser = parser
 }
 
@@ -171,7 +172,7 @@ func (this *UdpClient) startUDPProcess() {
 	// }
 	for {
 		if this.parser != nil {
-			err := this.parser.Parse(this)
+			err := this.parser(this)
 			if err != nil {
 				if this.listener != nil {
 					this.listener.OnError(1, "Read error:"+err.Error())

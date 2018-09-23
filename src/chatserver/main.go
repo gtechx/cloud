@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"gtdb"
+	"gtmsg"
 	"io"
 	"io/ioutil"
 	"net"
@@ -75,7 +76,8 @@ type serverconfig struct {
 var srvconfig *serverconfig
 var isQuit bool
 var dbMgr *gtdb.DBManager
-var configpath string = "../res/config/chatserver.config"
+var configpath = "../res/config/chatserver.config"
+var configjson string
 
 func main() {
 	quit = make(chan os.Signal, 1)
@@ -332,15 +334,18 @@ func loop() {
 				}
 
 				//send event to other server
-				msg := &SMsgUserOnline{Uid: conndata.tbl_appdata.ID, ServerAddr: srvconfig.ServerAddr}
-				msg.MsgId = SMsgId_UserOnline
-				msgbytes := Bytes(msg)
+				msg := &gtmsg.SMsgUserOnline{Uid: conndata.tbl_appdata.ID, ServerAddr: srvconfig.ServerAddr}
+				sendMsgToExchangeServer(gtmsg.SMsgId_UserOnline, msg)
 
-				if broadcastServerEvent(msgbytes) != nil {
-					fmt.Println(err.Error())
-					sess.Stop()
-					continue
-				}
+				// msg := &gtmsg.SMsgUserOnline{Uid: conndata.tbl_appdata.ID, ServerAddr: srvconfig.ServerAddr}
+				// msg.MsgId = gtmsg.SMsgId_UserOnline
+				// msgbytes := Bytes(msg)
+
+				// if broadcastServerEvent(msgbytes) != nil {
+				// 	fmt.Println(err.Error())
+				// 	sess.Stop()
+				// 	continue
+				// }
 
 				err = dbMgr.AddOnlineUser(srvconfig.ServerAddr, conndata.tbl_appdata.ID)
 
@@ -373,27 +378,27 @@ func loop() {
 			data := event.Data
 			fmt.Println("processing server event msgid " + String(event.Msgid))
 			switch event.Msgid {
-			case SMsgId_ServerQuit:
+			case gtmsg.SMsgId_ServerQuit:
 				isQuit = true
-			case SMsgId_UserOnline:
+			case gtmsg.SMsgId_UserOnline:
 				uid := Uint64(data)
 				serveraddr := String(data[8:])
 				// strarr := strings.Split(platformandserver, "#")
 				// //platform := strarr[0]
 				// serveraddr := strarr[1]
 				addOLUser(serveraddr, uid)
-			case SMsgId_UserOffline:
+			case gtmsg.SMsgId_UserOffline:
 				uid := Uint64(data)
 				serveraddr := String(data[8:])
 				removeOLUser(serveraddr, uid)
-			case SMsgId_RoomAddUser:
+			case gtmsg.SMsgId_RoomAddUser:
 				rid := Uint64(data)
 				uid := Uint64(data[8:])
 				roomusers, ok := roomMapLocal[rid]
 				if ok {
 					roomusers[uid] = true
 				}
-			case SMsgId_RoomRemoveUser:
+			case gtmsg.SMsgId_RoomRemoveUser:
 				rid := Uint64(data)
 				uid := Uint64(data[8:])
 				roomusers, ok := roomMapLocal[rid]
@@ -403,7 +408,7 @@ func loop() {
 						delete(roomusers, uid)
 					}
 				}
-			case SMsgId_RoomDimiss:
+			case gtmsg.SMsgId_RoomDimiss:
 				rid := Uint64(data)
 				_, ok := roomMapLocal[rid]
 				if ok {
@@ -430,13 +435,13 @@ func loop() {
 			data := msg.Data
 			fmt.Println("processing server msg msgid " + String(msg.Msgid))
 			switch msg.Msgid {
-			case SMsgId_UserMessage:
+			case gtmsg.SMsgId_UserMessage:
 				uid := Uint64(data)
 				SendMsgToLocalUid(uid, data[8:])
-			case SMsgId_RoomMessage:
+			case gtmsg.SMsgId_RoomMessage:
 				rid := Uint64(data)
 				SendMsgToLocalRoom(rid, data[8:])
-			case SMsgId_ZonePublicMessage:
+			case gtmsg.SMsgId_ZonePublicMessage:
 				len := int(data[0])
 				appname := String(data[1 : 1+len])
 				data = data[1+len:]
@@ -444,12 +449,12 @@ func loop() {
 				zonename := String(data[1 : 1+len])
 				data = data[1+len:]
 				SendZonePublicMsg(appname, zonename, data)
-			case SMsgId_AppPublicMessage:
+			case gtmsg.SMsgId_AppPublicMessage:
 				len := int(data[0])
 				appname := String(data[1 : 1+len])
 				data = data[1+len:]
 				SendAppPublicMsg(appname, data)
-			case SMsgId_ServerPublicMessage:
+			case gtmsg.SMsgId_ServerPublicMessage:
 				SendServerPublicMsg(data)
 			}
 
@@ -525,14 +530,16 @@ func loop() {
 					}
 
 					//send event to other server
-					msg := &SMsgUserOffline{Uid: sess.ID(), ServerAddr: srvconfig.ServerAddr}
-					msg.MsgId = SMsgId_UserOffline
-					msgbytes := Bytes(msg)
+					msg := &gtmsg.SMsgUserOffline{Uid: sess.ID(), ServerAddr: srvconfig.ServerAddr}
+					sendMsgToExchangeServer(gtmsg.SMsgId_UserOffline, msg)
+					// msg := &gtmsg.SMsgUserOffline{Uid: sess.ID(), ServerAddr: srvconfig.ServerAddr}
+					// msg.MsgId = gtmsg.SMsgId_UserOffline
+					// msgbytes := Bytes(msg)
 
-					if broadcastServerEvent(msgbytes) != nil {
-						fmt.Println(err.Error())
-						continue
-					}
+					// if broadcastServerEvent(msgbytes) != nil {
+					// 	fmt.Println(err.Error())
+					// 	continue
+					// }
 
 					dbMgr.RemoveOnlineUser(srvconfig.ServerAddr, sess.ID())
 
@@ -551,8 +558,6 @@ func loop() {
 		}
 	}
 }
-
-var configjson string
 
 func readConfig() {
 	// cf, err := os.Open("../res/config/chatserver.config")
@@ -653,7 +658,7 @@ func packageMsg(msgtype uint8, id uint16, msgid uint16, data interface{}) []byte
 	return ret
 }
 
-func readMsgHeader(conn net.Conn) (byte, uint16, uint16, uint16, []byte, error) {
+func readMsgHeader(reader io.Reader) (byte, uint16, uint16, uint16, []byte, error) {
 	typebuff := make([]byte, 1)
 	idbuff := make([]byte, 2)
 	sizebuff := make([]byte, 2)
@@ -663,7 +668,7 @@ func readMsgHeader(conn net.Conn) (byte, uint16, uint16, uint16, []byte, error) 
 	var msgid uint16
 	var databuff []byte
 
-	_, err := io.ReadFull(conn, typebuff)
+	_, err := io.ReadFull(reader, typebuff)
 	if err != nil {
 		goto end
 	}
@@ -674,7 +679,7 @@ func readMsgHeader(conn net.Conn) (byte, uint16, uint16, uint16, []byte, error) 
 		goto end
 	}
 
-	_, err = io.ReadFull(conn, idbuff)
+	_, err = io.ReadFull(reader, idbuff)
 	if err != nil {
 		goto end
 	}
@@ -682,7 +687,7 @@ func readMsgHeader(conn net.Conn) (byte, uint16, uint16, uint16, []byte, error) 
 
 	//fmt.Println("id:", id)
 
-	_, err = io.ReadFull(conn, sizebuff)
+	_, err = io.ReadFull(reader, sizebuff)
 	if err != nil {
 		goto end
 	}
@@ -695,7 +700,7 @@ func readMsgHeader(conn net.Conn) (byte, uint16, uint16, uint16, []byte, error) 
 		goto end
 	}
 
-	_, err = io.ReadFull(conn, msgidbuff)
+	_, err = io.ReadFull(reader, msgidbuff)
 	if err != nil {
 		goto end
 	}
@@ -709,7 +714,7 @@ func readMsgHeader(conn net.Conn) (byte, uint16, uint16, uint16, []byte, error) 
 
 	databuff = make([]byte, size)
 
-	_, err = io.ReadFull(conn, databuff)
+	_, err = io.ReadFull(reader, databuff)
 	if err != nil {
 		goto end
 	}

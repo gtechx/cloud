@@ -6,7 +6,7 @@ import (
 )
 
 type Client struct {
-	parser   IDataParser
+	parser   func(io.Reader) error
 	listener IConnListener
 
 	addr string
@@ -15,7 +15,7 @@ type Client struct {
 	client IClient
 }
 
-func NewClient(net, addr string) *Client {
+func NewClient(net, addr string, parser func(io.Reader) error) *Client {
 	return &Client{addr: addr, net: net}
 }
 
@@ -38,7 +38,7 @@ func (this *Client) Connect() error {
 		return err
 	}
 
-	this.client.SetDataParser(this)
+	this.client.SetDataParser(this.parser)
 	this.client.SetListener(this)
 
 	return nil
@@ -52,7 +52,7 @@ func (this *Client) LocalAddr() string {
 	return this.client.LocalAddr()
 }
 
-func (this *Client) SetDataParser(parser IDataParser) {
+func (this *Client) SetDataParser(parser func(io.Reader) error) {
 	this.parser = parser
 }
 
@@ -76,7 +76,7 @@ func (this *Client) Send(buff []byte) {
 
 func (this *Client) Parse(reader io.Reader) error {
 	if this.parser != nil {
-		return this.parser.Parse(reader)
+		return this.parser(reader)
 	}
 	return nil
 }

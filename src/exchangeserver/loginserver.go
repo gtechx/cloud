@@ -10,7 +10,7 @@ import (
 
 func startLoginServerMonitor() {
 	server := gtnet.NewServer()
-	err := server.Start(srvconfig.ServerNet, srvconfig.ServerAddr, onLoginServerConn)
+	err := server.Start(srvconfig.ServerNetForChat, srvconfig.ServerAddrForChat, onLoginServerConn)
 	if err != nil {
 		panic(err.Error())
 	}

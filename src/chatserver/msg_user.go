@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"gtdb"
+	"gtmsg"
 	"time"
 
 	. "github.com/gtechx/base/common"
@@ -77,7 +78,7 @@ func HandlerReqUserData(sess ISession, data []byte) (uint16, interface{}) {
 
 func SendMessageToSelfExceptMe(sess ISession, data []byte) uint16 {
 	sesslist, ok := sessMap[sess.ID()]
-	var err error
+	//var err error
 
 	if ok {
 		for _, tsess := range sesslist {
@@ -93,16 +94,19 @@ func SendMessageToSelfExceptMe(sess ISession, data []byte) uint16 {
 		for saddr, _ := range olinfo {
 			if len(saddr) != 0 {
 				//on other server
-				msg := &SMsgUserMessage{}
-				msg.MsgId = SMsgId_UserMessage
-				msg.Uid = sess.ID()
-				msg.Data = data
+				msgdata := &gtmsg.UserMessageData{}
+				msgdata.Uid = sess.ID()
+				msgdata.Data = data
 
-				fmt.Println("SendMessageToSelfExceptMe send msg to server ", saddr, " to ", sess.ID())
-				err = dbMgr.SendMsgToServer(saddr, Bytes(msg))
-				if err != nil {
-					return ERR_DB
-				}
+				msgdatabytes, _ := json.Marshal(msgdata)
+				msg := &gtmsg.SMsgUserMessage{ServerAddr: saddr, Data: msgdatabytes}
+				sendMsgToExchangeServer(gtmsg.SMsgId_UserMessage, msg)
+
+				// fmt.Println("SendMessageToSelfExceptMe send msg to server ", saddr, " to ", sess.ID())
+				// err = dbMgr.SendMsgToServer(saddr, Bytes(msg))
+				// if err != nil {
+				// 	return ERR_DB
+				// }
 			}
 		}
 	}
@@ -121,17 +125,25 @@ func SendMessageToUser(to uint64, data []byte) uint16 {
 				SendMsgToLocalUid(to, data)
 			} else {
 				//on other server
-				msg := &SMsgUserMessage{}
-				msg.MsgId = SMsgId_UserMessage
-				msg.Uid = to
-				msg.Data = data //append(Bytes(who), msgbytes...)
-				// senddata = append(senddata, Bytes(platform)...)
-				// senddata = append(senddata, msgbytes...)
-				fmt.Println("SendMessageToUser send msg to server ", saddr, " to ", to)
-				err = dbMgr.SendMsgToServer(saddr, Bytes(msg))
-				if err != nil {
-					return ERR_DB
-				}
+				msgdata := &gtmsg.UserMessageData{}
+				msgdata.Uid = to
+				msgdata.Data = data
+
+				msgdatabytes, _ := json.Marshal(msgdata)
+				msg := &gtmsg.SMsgUserMessage{ServerAddr: saddr, Data: msgdatabytes}
+				sendMsgToExchangeServer(gtmsg.SMsgId_UserMessage, msg)
+
+				// msg := &SMsgUserMessage{}
+				// msg.MsgId = SMsgId_UserMessage
+				// msg.Uid = to
+				// msg.Data = data //append(Bytes(who), msgbytes...)
+				// // senddata = append(senddata, Bytes(platform)...)
+				// // senddata = append(senddata, msgbytes...)
+				// fmt.Println("SendMessageToUser send msg to server ", saddr, " to ", to)
+				// err = dbMgr.SendMsgToServer(saddr, Bytes(msg))
+				// if err != nil {
+				// 	return ERR_DB
+				// }
 			}
 		}
 	} else {

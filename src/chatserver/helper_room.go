@@ -2,10 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"gtmsg"
 
 	"gtdb"
-
-	. "github.com/gtechx/base/common"
+	//. "github.com/gtechx/base/common"
 )
 
 //所有这类函数，返回false表示出错
@@ -29,14 +29,16 @@ func deleteRoom(rid uint64, perrcode *uint16) bool {
 		return false
 	}
 
-	msg := &SMsgRoomDimiss{Rid: rid}
-	msg.MsgId = SMsgId_RoomDimiss
-	msgbytes := Bytes(msg)
+	msg := &gtmsg.SMsgRoomDimiss{Rid: rid}
+	sendMsgToExchangeServer(gtmsg.SMsgId_RoomDimiss, msg)
+	// msg := &SMsgRoomDimiss{Rid: rid}
+	// msg.MsgId = SMsgId_RoomDimiss
+	// msgbytes := Bytes(msg)
 
-	if broadcastServerEvent(msgbytes) != nil {
-		*perrcode = ERR_DB
-		return false
-	}
+	// if broadcastServerEvent(msgbytes) != nil {
+	// 	*perrcode = ERR_DB
+	// 	return false
+	// }
 	return true
 }
 
@@ -110,14 +112,16 @@ func addRoomUser(rid, appdataid uint64, presence *MsgRoomPresence, perrcode *uin
 	if err != nil {
 		*perrcode = ERR_DB
 	} else {
-		msg := &SMsgRoomAddUser{Rid: rid, Uid: appdataid}
-		msg.MsgId = SMsgId_RoomAddUser
-		msgbytes := Bytes(msg)
+		msg := &gtmsg.SMsgRoomAddUser{Rid: rid, Uid: appdataid}
+		sendMsgToExchangeServer(gtmsg.SMsgId_RoomDimiss, msg)
+		// msg := &SMsgRoomAddUser{Rid: rid, Uid: appdataid}
+		// msg.MsgId = SMsgId_RoomAddUser
+		// msgbytes := Bytes(msg)
 
-		if broadcastServerEvent(msgbytes) != nil {
-			*perrcode = ERR_DB
-			return false
-		}
+		// if broadcastServerEvent(msgbytes) != nil {
+		// 	*perrcode = ERR_DB
+		// 	return false
+		// }
 
 		presencebytes, err := json.Marshal(presence)
 		if err != nil {
@@ -280,14 +284,16 @@ func removeRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
 		return false
 	}
 
-	msg := &SMsgRoomRemoveUser{Rid: rid, Uid: appdataid}
-	msg.MsgId = SMsgId_RoomRemoveUser
-	msgbytes := Bytes(msg)
+	msg := &gtmsg.SMsgRoomRemoveUser{Rid: rid, Uid: appdataid}
+	sendMsgToExchangeServer(gtmsg.SMsgId_RoomDimiss, msg)
+	// msg := &SMsgRoomRemoveUser{Rid: rid, Uid: appdataid}
+	// msg.MsgId = SMsgId_RoomRemoveUser
+	// msgbytes := Bytes(msg)
 
-	if broadcastServerEvent(msgbytes) != nil {
-		*perrcode = ERR_DB
-		return false
-	}
+	// if broadcastServerEvent(msgbytes) != nil {
+	// 	*perrcode = ERR_DB
+	// 	return false
+	// }
 	return true
 }
 

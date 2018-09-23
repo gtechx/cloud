@@ -23,7 +23,7 @@ type IConn interface {
 	Close() error
 	LocalAddr() string
 	RemoteAddr() string
-	SetDataParser(IDataParser)
+	SetDataParser(func(io.Reader) error)
 	SetListener(IConnListener)
 }
 

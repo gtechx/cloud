@@ -1,6 +1,7 @@
 package main
 
 import (
+	"gtmsg"
 	"time"
 
 	"gtdb"
@@ -418,10 +419,12 @@ func SendMsgToRoom(rid uint64, msgbytes []byte) (uint16, uint16) {
 	// 	return ERR_DB, ERR_DB
 	// }
 
-	msg := &SMsgRoomMessage{}
-	msg.MsgId = SMsgId_RoomMessage
-	msg.Rid = rid
-	msg.Data = senddata //append(Bytes(who), msgbytes...)
+	msg := &gtmsg.SMsgRoomMessage{Rid: rid, Data: senddata}
+	sendMsgToExchangeServer(gtmsg.SMsgId_RoomDimiss, msg)
+	// msg := &SMsgRoomMessage{}
+	// msg.MsgId = SMsgId_RoomMessage
+	// msg.Rid = rid
+	// msg.Data = senddata //append(Bytes(who), msgbytes...)
 	// for _, serveraddr := range serverlist {
 	// 	if serveraddr == srvconfig.ServerAddr {
 	// 		continue

@@ -2,11 +2,12 @@ package gtnet
 
 import (
 	"fmt"
+	"io"
 	"net"
 )
 
 type Conn struct {
-	parser   IDataParser
+	parser   func(io.Reader) error
 	listener IConnListener
 
 	conn net.Conn
@@ -28,7 +29,7 @@ func (this *Conn) LocalAddr() string {
 	return this.conn.LocalAddr().String()
 }
 
-func (this *Conn) SetDataParser(parser IDataParser) {
+func (this *Conn) SetDataParser(parser func(io.Reader) error) {
 	this.parser = parser
 }
 
@@ -64,7 +65,7 @@ func (this *Conn) startRecv() {
 	conn := this.conn
 	for {
 		if this.parser != nil {
-			err := this.parser.Parse(conn)
+			err := this.parser(conn)
 			if err != nil {
 				if this.listener != nil {
 					this.listener.OnError(1, "Read error:"+err.Error())

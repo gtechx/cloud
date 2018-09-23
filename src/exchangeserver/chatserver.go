@@ -10,7 +10,7 @@ import (
 
 func startChatServerMonitor() {
 	server := gtnet.NewServer()
-	err := server.Start(srvconfig.ServerNet, srvconfig.ServerAddr, onChatServerConn)
+	err := server.Start(srvconfig.ServerNetForChat, srvconfig.ServerAddrForChat, onChatServerConn)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -26,7 +26,7 @@ func onChatServerConn(conn net.Conn) {
 		fmt.Println(err.Error())
 		return
 	}
-
+	fmt.Println("new msg msgtype:", msgtype, " id:", id, " size:", size, " msgid:", msgid)
 	// if msgid != 9 {
 	// 	return
 	// }
