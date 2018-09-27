@@ -10,9 +10,6 @@ import (
 	"github.com/gtechx/base/collections"
 	. "github.com/gtechx/base/common"
 	"github.com/gtechx/base/gtnet"
-
-	"github.com/emirpasic/gods/trees/binaryheap"
-	"github.com/emirpasic/gods/utils"
 )
 
 var exchangeServerSendList = collections.NewSafeList() //*collections.SafeList
@@ -23,17 +20,11 @@ type ChatServerData struct {
 	Count      int    `json:"count"`
 }
 
-var chatserverheap *binaryheap.Heap
+var chatServerMap = map[string]int{}
+var minUserServer string
+var minUserCount int = 999999
 
 func messagePullStart() {
-	bhcomparator := func(a, b interface{}) int {
-		csa := a.(*ChatServerData)
-		csb := b.(*ChatServerData)
-		fmt.Println("bhcomparator:", csa.Count, "/", csb.Count)
-		return utils.IntComparator(csa.Count, csb.Count)
-	}
-	chatserverheap = binaryheap.NewWith(bhcomparator)
-
 	exchangeServerClient = gtnet.NewClient("tcp", "127.0.0.1:30000", Parser)
 	err := exchangeServerClient.Connect()
 	if err != nil {
@@ -76,8 +67,7 @@ func Parser(reader io.Reader) error {
 			return err
 		}
 		fmt.Println("new msg msgtype:", msgtype, " id:", id, " size:", size, " msgid:", msgid)
-		// msg := &ServerEvent{Msgid: msgid, Data: databuff}
-		// serverEventQueue.Put(msg)
+
 		serverlist := map[string]int{}
 		err = json.Unmarshal(databuff, &serverlist)
 		if err != nil {
@@ -86,11 +76,21 @@ func Parser(reader io.Reader) error {
 		}
 
 		fmt.Println("serverlist:", serverlist)
-		chatserverheap.Clear()
+		chatServerMap = map[string]int{}
+		mincount := 9999
+		minserver := ""
 		for saddr, count := range serverlist {
-			sdata := &ChatServerData{saddr, count}
-			fmt.Println("sdata:", sdata)
-			chatserverheap.Push(sdata)
+			if count < mincount {
+				mincount = count
+				minserver = saddr
+			}
+			chatServerMap[saddr] = count
+		}
+
+		_, ok := chatServerMap[minUserServer]
+		if !ok || mincount < minUserCount {
+			minUserCount = mincount
+			minUserServer = minserver
 		}
 	}
 	return nil

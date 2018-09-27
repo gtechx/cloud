@@ -35,20 +35,6 @@ func getChatLoginToken(databytes []byte) (string, error) {
 	return token, nil
 }
 
-func getChatServerAddr() string {
-	// it := list.Iterator()
-	// for it.Next() {
-	// 	index, value := it.Index(), it.Value()
-	// 	...
-	// }
-	saddr, ok := chatserverheap.Peek()
-	if ok {
-		return saddr.(*ChatServerData).ServerAddr
-	}
-
-	return ""
-}
-
 func checkAppname(appname string) (uint16, string) {
 	flag, err := dbMgr.IsAppExists(appname)
 
@@ -94,7 +80,7 @@ func chatlogin(rw http.ResponseWriter, req *http.Request) {
 				ret.ErrorDesc = err.Error()
 			} else {
 				//get chat server addr
-				ret.ServerAddr = getChatServerAddr()
+				ret.ServerAddr = minUserServer
 				ret.Token, err = getChatLoginToken(databytes)
 				if err != nil {
 					ret.ErrorCode = 1
@@ -158,7 +144,7 @@ func chatcreateuser(rw http.ResponseWriter, req *http.Request) {
 				ret.ErrorDesc = err.Error()
 			} else {
 				//get chat server addr
-				ret.ServerAddr = getChatServerAddr()
+				ret.ServerAddr = minUserServer
 				ret.Token, err = getChatLoginToken(databytes)
 				if err != nil {
 					ret.ErrorCode = 1
