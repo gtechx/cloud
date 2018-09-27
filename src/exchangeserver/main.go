@@ -2,15 +2,14 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"gtmsg"
-	"io"
 	"io/ioutil"
 	"net"
 	"os"
 	"os/signal"
+	"time"
 
 	"gtdb"
 
@@ -68,7 +67,7 @@ type serverconfig struct {
 
 var srvconfig *serverconfig
 var dbMgr *gtdb.DBManager
-var configpath = "../res/config/chatserver.config"
+var configpath = "../res/config/exchangeserver.config"
 var configjson string
 
 func main() {
@@ -102,6 +101,9 @@ func main() {
 	}
 	defer dbMgr.UnInitialize()
 
+	startLoginServerMonitor()
+	startChatServerMonitor()
+
 	fmt.Println("server start on ServerAddrForChat " + srvconfig.ServerAddrForChat + " ok...")
 
 	go loop()
@@ -126,6 +128,8 @@ func readConfig() {
 
 func loop() {
 	for {
+		starttime := time.Now().UnixNano()
+
 		select {
 		case conn := <-loginServerAddChan:
 			loginServerMap[conn] = true
@@ -149,11 +153,14 @@ func loop() {
 			fmt.Println("processing chatserver msg msgid " + String(msg.Msgid))
 			switch msg.Msgid {
 			case gtmsg.SMsgId_UserOnline:
-				count := int(data[0])
-				chatServerMap[msg.Server] += count
+				msgdata := &gtmsg.SMsgUserOnline{}
+				err = json.Unmarshal(data, msgdata)
+				if err == nil {
+					chatServerMap[msg.Server] += len(msgdata.Uids)
+				}
 
 				//broadcast to other chat server of uid online
-				broadcastUserOnline(msg.Server, data[1:])
+				broadcastMsgToOtherChatServer(msg.Server, gtmsg.SMsgId_UserOnline, data)
 				// uidcount := int(data[1])
 				// data = data[2:]
 				// for i := 0; i < uidcount; i++ {
@@ -162,18 +169,17 @@ func loop() {
 				// 	data = data[8:]
 				// }
 			case gtmsg.SMsgId_UserOffline:
-				count := int(data[0])
-				chatServerMap[msg.Server] += count
-
-				//broadcast to other chat server of uid offline
-				broadcastUserOffline(msg.Server, data[1:])
-				// uidcount := int(data[1])
-				// data = data[2:]
-				// for i := 0; i < uidcount; i++ {
-				// 	uid := Uint64(data[2:])
-
-				// 	data = data[8:]
-				// }
+				msgdata := &gtmsg.SMsgUserOffline{}
+				err = json.Unmarshal(data, msgdata)
+				if err == nil {
+					chatServerMap[msg.Server] -= len(msgdata.Uids)
+				}
+			case gtmsg.SMsgId_UserMessage:
+				msgdata := &gtmsg.SMsgUserMessage{}
+				err = json.Unmarshal(data, msgdata)
+				if err == nil {
+					broadcastMsgToOtherChatServer(msg.Server, gtmsg.SMsgId_UserMessage, data)
+				}
 			}
 		}
 
@@ -185,11 +191,23 @@ func loop() {
 
 			msg := item.(*Msg)
 			//data := msg.Data
-			fmt.Println("processing loginserver msg msgid " + String(msg.Msgid))
 			switch msg.Msgid {
 			case gtmsg.SMsgId_ReqChatServerList:
-				msg.LoginConn.Write(genChatServerList())
+				retdata := genChatServerList()
+				//fmt.Println("processing loginserver msg msgid " + String(msg.Msgid))
+				//fmt.Println("ret data:" + string(retdata))
+				senddata := gtmsg.PackageMsg(gtmsg.RetFrame, 0, gtmsg.SMsgId_ReqChatServerList, retdata)
+				msg.LoginConn.Write(senddata)
 			}
+		}
+
+		endtime := time.Now().UnixNano()
+		delta := endtime - starttime
+		sleeptime := 100*1000000 - delta
+		//fmt.Println("starttime:", starttime, "endtime:", endtime, " sleeptime:", sleeptime)
+		if sleeptime > 0 {
+			//fmt.Println("starttime:", starttime, "endtime:", endtime, " sleeptime:", sleeptime)
+			time.Sleep(time.Nanosecond * time.Duration(sleeptime))
 		}
 	}
 }
@@ -203,8 +221,8 @@ func genChatServerList() []byte {
 	return data
 }
 
-func broadcastUserOnline(chatserver *ChatServer, data []byte) {
-	senddata := packageMsg(gtmsg.RetFrame, 0, gtmsg.SMsgId_UserOnline, data)
+func broadcastMsgToOtherChatServer(chatserver *ChatServer, msgid uint16, data []byte) {
+	senddata := gtmsg.PackageMsg(gtmsg.RetFrame, 0, msgid, data)
 	for s, _ := range chatServerMap {
 		if chatserver != s {
 			s.conn.Write(senddata)
@@ -213,89 +231,10 @@ func broadcastUserOnline(chatserver *ChatServer, data []byte) {
 }
 
 func broadcastUserOffline(chatserver *ChatServer, data []byte) {
-	senddata := packageMsg(gtmsg.RetFrame, 0, gtmsg.SMsgId_UserOnline, data)
+	senddata := gtmsg.PackageMsg(gtmsg.RetFrame, 0, gtmsg.SMsgId_UserOnline, data)
 	for s, _ := range chatServerMap {
 		if chatserver != s {
 			s.conn.Write(senddata)
 		}
 	}
-}
-
-func packageMsg(msgtype uint8, id uint16, msgid uint16, data interface{}) []byte {
-	ret := []byte{}
-	databuff := Bytes(data)
-	datalen := uint16(len(databuff))
-	ret = append(ret, byte(msgtype))
-	ret = append(ret, Bytes(id)...)
-	ret = append(ret, Bytes(datalen)...)
-	ret = append(ret, Bytes(msgid)...)
-
-	if datalen > 0 {
-		ret = append(ret, databuff...)
-	}
-	return ret
-}
-
-func readMsgHeader(conn net.Conn) (byte, uint16, uint16, uint16, []byte, error) {
-	typebuff := make([]byte, 1)
-	idbuff := make([]byte, 2)
-	sizebuff := make([]byte, 2)
-	msgidbuff := make([]byte, 2)
-	var id uint16
-	var size uint16
-	var msgid uint16
-	var databuff []byte
-
-	_, err := io.ReadFull(conn, typebuff)
-	if err != nil {
-		goto end
-	}
-
-	//fmt.Println("data type:", typebuff[0])
-
-	if typebuff[0] == gtmsg.TickFrame {
-		goto end
-	}
-
-	_, err = io.ReadFull(conn, idbuff)
-	if err != nil {
-		goto end
-	}
-	id = Uint16(idbuff)
-
-	//fmt.Println("id:", id)
-
-	_, err = io.ReadFull(conn, sizebuff)
-	if err != nil {
-		goto end
-	}
-	size = Uint16(sizebuff)
-
-	//fmt.Println("data size:", size)
-
-	if size > 65535 {
-		err = errors.New("too long data size")
-		goto end
-	}
-
-	_, err = io.ReadFull(conn, msgidbuff)
-	if err != nil {
-		goto end
-	}
-	msgid = Uint16(msgidbuff)
-
-	//fmt.Println("msgid:", msgid)
-
-	if size == 0 {
-		goto end
-	}
-
-	databuff = make([]byte, size)
-
-	_, err = io.ReadFull(conn, databuff)
-	if err != nil {
-		goto end
-	}
-end:
-	return typebuff[0], id, size, msgid, databuff, err
 }

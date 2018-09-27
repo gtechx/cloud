@@ -106,6 +106,7 @@ func main() {
 	}
 	defer dbMgr.UnInitialize()
 
+	messagePullStart()
 	go startHTTPServer()
 	fmt.Println("server start on addr " + srvconfig.ServerAddr + " ok...")
 

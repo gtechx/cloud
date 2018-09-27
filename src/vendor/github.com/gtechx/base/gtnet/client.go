@@ -16,7 +16,7 @@ type Client struct {
 }
 
 func NewClient(net, addr string, parser func(io.Reader) error) *Client {
-	return &Client{addr: addr, net: net}
+	return &Client{addr: addr, net: net, parser: parser}
 }
 
 func (this *Client) Connect() error {

@@ -89,81 +89,29 @@ func SendMessageToSelfExceptMe(sess ISession, data []byte) uint16 {
 		}
 	}
 
-	olinfo, ok := userOLMapAll[sess.ID()]
-	if ok {
-		for saddr, _ := range olinfo {
-			if len(saddr) != 0 {
-				//on other server
-				msgdata := &gtmsg.UserMessageData{}
-				msgdata.Uid = sess.ID()
-				msgdata.Data = data
-
-				msgdatabytes, _ := json.Marshal(msgdata)
-				msg := &gtmsg.SMsgUserMessage{ServerAddr: saddr, Data: msgdatabytes}
-				sendMsgToExchangeServer(gtmsg.SMsgId_UserMessage, msg)
-
-				// fmt.Println("SendMessageToSelfExceptMe send msg to server ", saddr, " to ", sess.ID())
-				// err = dbMgr.SendMsgToServer(saddr, Bytes(msg))
-				// if err != nil {
-				// 	return ERR_DB
-				// }
-			}
-		}
-	}
 	return ERR_NONE
 }
 
-func SendMessageToUser(to uint64, data []byte) uint16 {
-	olinfo, ok := userOLMapAll[to]
-	var err error
+func SendMessageToUser(from, to uint64, data []byte) uint16 {
+	sesslist, ok := sessMap[to]
 
 	if ok {
-		for saddr, _ := range olinfo {
-			if len(saddr) == 0 {
-				//on local server
-				fmt.Println("SendMessageToUser send msg to local server to ", to)
-				SendMsgToLocalUid(to, data)
-			} else {
-				//on other server
-				msgdata := &gtmsg.UserMessageData{}
-				msgdata.Uid = to
-				msgdata.Data = data
-
-				msgdatabytes, _ := json.Marshal(msgdata)
-				msg := &gtmsg.SMsgUserMessage{ServerAddr: saddr, Data: msgdatabytes}
-				sendMsgToExchangeServer(gtmsg.SMsgId_UserMessage, msg)
-
-				// msg := &SMsgUserMessage{}
-				// msg.MsgId = SMsgId_UserMessage
-				// msg.Uid = to
-				// msg.Data = data //append(Bytes(who), msgbytes...)
-				// // senddata = append(senddata, Bytes(platform)...)
-				// // senddata = append(senddata, msgbytes...)
-				// fmt.Println("SendMessageToUser send msg to server ", saddr, " to ", to)
-				// err = dbMgr.SendMsgToServer(saddr, Bytes(msg))
-				// if err != nil {
-				// 	return ERR_DB
-				// }
-			}
-		}
-	} else {
-		//offline
-		err = dbMgr.SendMsgToUserOffline(to, data)
-		if err != nil {
-			return ERR_DB
+		for _, sess := range sesslist {
+			sess.Send(data)
 		}
 	}
-	return ERR_NONE
-	// flag, err := dbMgr.IsUserOnline(to)
-	// if err != nil {
-	// 	return ERR_DB
-	// }
 
-	// if flag {
-	// 	return SendMessageToUserOnline(to, data)
-	// } else {
-	// 	return SendMessageToUserOffline(to, data)
-	// }
+	msg := &gtmsg.SMsgUserMessage{ServerAddr: srvconfig.ServerAddr, From: from, To: to, Data: data}
+	msgdata, _ := json.Marshal(msg)
+	sendMsgToExchangeServer(gtmsg.SMsgId_UserMessage, msgdata)
+
+	//add to message history
+	err := dbMgr.SendMsgToUserHistory(to, data)
+	if err != nil {
+		return ERR_DB
+	}
+
+	return ERR_NONE
 }
 
 func SendMessageToFriendsOnline(id uint64, data []byte) uint16 {
@@ -244,7 +192,7 @@ func HandlerPresence(sess ISession, data []byte) (uint16, interface{}) {
 								errcode = ERR_DB
 							} else {
 								//send to who
-								errcode = SendMessageToUser(who, senddata)
+								errcode = SendMessageToUser(sess.ID(), who, senddata)
 								// if errcode != ERR_NONE {
 
 								// }
@@ -273,7 +221,7 @@ func HandlerPresence(sess ISession, data []byte) (uint16, interface{}) {
 								errcode = ERR_INVALID_JSON
 							} else {
 								senddata := packageMsg(RetFrame, 0, MsgId_Presence, presencebytes)
-								errcode = SendMessageToUser(who, senddata)
+								errcode = SendMessageToUser(sess.ID(), who, senddata)
 								dbMgr.RemovePresence(sess.ID(), who)
 							}
 						}
@@ -297,7 +245,7 @@ func HandlerPresence(sess ISession, data []byte) (uint16, interface{}) {
 								errcode = ERR_INVALID_JSON
 							} else {
 								senddata := packageMsg(RetFrame, 0, MsgId_Presence, presencebytes)
-								errcode = SendMessageToUser(who, senddata)
+								errcode = SendMessageToUser(sess.ID(), who, senddata)
 							}
 						}
 					}
@@ -316,7 +264,7 @@ func HandlerPresence(sess ISession, data []byte) (uint16, interface{}) {
 							errcode = ERR_INVALID_JSON
 						} else {
 							senddata := packageMsg(RetFrame, 0, MsgId_Presence, presencebytes)
-							errcode = SendMessageToUser(who, senddata)
+							errcode = SendMessageToUser(sess.ID(), who, senddata)
 							dbMgr.RemovePresence(sess.ID(), who)
 						}
 					}
@@ -492,7 +440,7 @@ func HandlerMessage(sess ISession, data []byte) (uint16, interface{}) {
 						errcode = ERR_UNKNOWN
 					} else {
 						senddata := packageMsg(RetFrame, 0, MsgId_Message, msgbytes)
-						errcode = SendMessageToUser(msg.To, senddata)
+						errcode = SendMessageToUser(sess.ID(), msg.To, senddata)
 						errcode = SendMessageToSelfExceptMe(sess, senddata)
 					}
 				}

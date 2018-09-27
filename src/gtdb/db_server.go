@@ -91,7 +91,7 @@ func (db *DBManager) UpdateChatServerTTL(serveraddr string, seconds int) error {
 	defer conn.Close()
 	conn.Send("MULTI")
 	conn.Send("EXPIRE", "ttl:"+serveraddr, seconds)
-	conn.Send("EXPIRE", "onlineuser:"+serveraddr, seconds)
+	//conn.Send("EXPIRE", "onlineuser:"+serveraddr, seconds)
 	_, err := conn.Do("EXEC")
 	return err
 }
@@ -128,26 +128,26 @@ func (db *DBManager) GetChatToken(token string) ([]byte, error) {
 // 	return err
 // }
 
-func (db *DBManager) AddOnlineUser(serveraddr string, uid uint64) error {
-	conn := db.rd.Get()
-	defer conn.Close()
-	_, err := conn.Do("SADD", "onlineuser:"+serveraddr, uid)
-	return err
-}
+// func (db *DBManager) AddOnlineUser(serveraddr string, uid uint64) error {
+// 	conn := db.rd.Get()
+// 	defer conn.Close()
+// 	_, err := conn.Do("SADD", "onlineuser:"+serveraddr, uid)
+// 	return err
+// }
 
-func (db *DBManager) RemoveOnlineUser(serveraddr string, uid uint64) error {
-	conn := db.rd.Get()
-	defer conn.Close()
-	_, err := conn.Do("SREM", "onlineuser:"+serveraddr, uid)
-	return err
-}
+// func (db *DBManager) RemoveOnlineUser(serveraddr string, uid uint64) error {
+// 	conn := db.rd.Get()
+// 	defer conn.Close()
+// 	_, err := conn.Do("SREM", "onlineuser:"+serveraddr, uid)
+// 	return err
+// }
 
-func (db *DBManager) GetAllOnlineUser(serveraddr string) ([]interface{}, error) {
-	conn := db.rd.Get()
-	defer conn.Close()
-	ret, err := conn.Do("SMEMBERS", "onlineuser:"+serveraddr)
-	return redis.Values(ret, err)
-}
+// func (db *DBManager) GetAllOnlineUser(serveraddr string) ([]interface{}, error) {
+// 	conn := db.rd.Get()
+// 	defer conn.Close()
+// 	ret, err := conn.Do("SMEMBERS", "onlineuser:"+serveraddr)
+// 	return redis.Values(ret, err)
+// }
 
 func (db *DBManager) SendServerEvent(serveraddr string, data []byte) error {
 	conn := db.rd.Get()

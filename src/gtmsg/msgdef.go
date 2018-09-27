@@ -118,16 +118,17 @@ end:
 const SMsgId_UserOnline uint16 = 10000
 
 type SMsgUserOnline struct {
-	Uid        uint64 `json:"uid"`
-	ServerAddr string `json:"serveraddr"` //use # connect platform and serveraddr
-	//ServerAddr string `json:"serveraddr"`
+	Uids       []uint64 `json:"uidarr"`
+	Platforms  []string `json:"platform"`
+	ServerAddr string   `json:"serveraddr"` //use # connect platform and serveraddr
 }
 
 const SMsgId_UserOffline uint16 = 10005
 
 type SMsgUserOffline struct {
-	Uid        uint64 `json:"uid"`
-	ServerAddr string `json:"serveraddr"`
+	Uids       []uint64 `json:"uidarr"`
+	Platforms  string   `json:"platform"`
+	ServerAddr string   `json:"serveraddr"` //use # connect platform and serveraddr
 }
 
 const SMsgId_RoomAddUser uint16 = 10010
@@ -169,19 +170,29 @@ const SMsgId_UserMessage uint16 = 20000
 
 type SMsgUserMessage struct {
 	ServerAddr string `json:"serveraddr"`
-	//Uid  uint64 `json:"uid"`
-	Data []byte `json:"data"` //UserMessageData
+	From       uint64 `json:"from"`
+	To         uint64 `json:"to"`
+	Data       []byte `json:"data"`
 }
 
-type UserMessageData struct {
-	Uid  uint64 `json:"uid"`
-	Data []byte `json:"data"`
-}
+// type UserMessageData struct {
+// 	Uid  uint64 `json:"uid"`
+// 	Data []byte `json:"data"`
+// }
 
 const SMsgId_RoomMessage uint16 = 20005
 
 type SMsgRoomMessage struct {
-	Rid  uint64 `json:"Rid"`
+	From uint64 `json:"from"`
+	To   uint64 `json:"to"`
+	Data []byte `json:"data"`
+}
+
+const SMsgId_RoomAdminMessage uint16 = 20006
+
+type SMsgRoomAdminMessage struct {
+	From uint64 `json:"from"`
+	To   uint64 `json:"to"`
 	Data []byte `json:"data"`
 }
 
@@ -190,14 +201,14 @@ const SMsgId_ZonePublicMessage uint16 = 20010
 type SMsgZonePublicMessage struct {
 	Appname  string `json:"appname"`
 	Zonename string `json:"zonename"`
-	Data     []byte `json:"data,string"`
+	Data     []byte `json:"data"`
 }
 
 const SMsgId_AppPublicMessage uint16 = 20015
 
 type SMsgAppPublicMessage struct {
 	Appname string `json:"appname"`
-	Data    []byte `json:"data,string"`
+	Data    []byte `json:"data"`
 }
 
 const SMsgId_ServerPublicMessage uint16 = 20020

@@ -117,39 +117,39 @@ func main() {
 	}
 
 	//register server
-	err = dbMgr.RegisterChatServer(srvconfig.ServerAddr)
+	// err = dbMgr.RegisterChatServer(srvconfig.ServerAddr)
 
-	if err != nil {
-		panic("register server to gtdata.Manager err:" + err.Error())
-	}
-	defer dbMgr.UnRegisterChatServer(srvconfig.ServerAddr)
+	// if err != nil {
+	// 	panic("register server to gtdata.Manager err:" + err.Error())
+	// }
+	// defer dbMgr.UnRegisterChatServer(srvconfig.ServerAddr)
 
 	//keep live init
-	keepLiveStart()
+	//keepLiveStart()
 
 	//check server
 	//checkAllServerAlive()
 
 	//other server live monitor init
-	serverMonitorStart()
+	//serverMonitorStart()
 
 	//read online user
-	serverlist, err := dbMgr.GetChatServerList()
+	// serverlist, err := dbMgr.GetChatServerList()
 
-	if err != nil {
-		panic(err.Error())
-	}
+	// if err != nil {
+	// 	panic(err.Error())
+	// }
 
-	for _, serveraddr := range serverlist {
-		users, err := dbMgr.GetAllOnlineUser(serveraddr)
-		if err != nil {
-			panic(err.Error())
-		}
-		for _, iuid := range users {
-			uid := Uint64(iuid)
-			addOLUser(serveraddr, uid)
-		}
-	}
+	// for _, serveraddr := range serverlist {
+	// 	users, err := dbMgr.GetAllOnlineUser(serveraddr)
+	// 	if err != nil {
+	// 		panic(err.Error())
+	// 	}
+	// 	for _, iuid := range users {
+	// 		uid := Uint64(iuid)
+	// 		addOLUser(serveraddr, uid)
+	// 	}
+	// }
 
 	server := gtnet.NewServer()
 	err = server.Start(srvconfig.ServerNet, srvconfig.ServerAddr, onNewConn)
@@ -158,6 +158,8 @@ func main() {
 	}
 	defer server.Stop()
 	defer dbMgr.ClearOnlineInfo(srvconfig.ServerAddr)
+
+	sendMsgToExchangeServer(0, []byte(srvconfig.ServerAddr))
 
 	//msg from other server monitor
 	messagePullStart()
@@ -285,6 +287,8 @@ func loop() {
 
 		limitcount := 0
 		//create sess for new user
+		uidarr := []uint64{}
+		platformarr := []string{}
 		for {
 			item, err := newConnList.Pop()
 			if err != nil {
@@ -292,17 +296,13 @@ func loop() {
 			}
 
 			conndata := item.(*ConnData)
+			_, ok := sessMap[conndata.tbl_appdata.ID]
 			sess := CreateSess(conndata.conn, conndata.tbl_appdata, conndata.platform)
 			sess.Start()
 
-			//add user to userOLMapAll
-			olinfo, ok := userOLMapAll[conndata.tbl_appdata.ID]
-			if !ok {
-				olinfo = map[string]bool{}
-				userOLMapAll[conndata.tbl_appdata.ID] = olinfo
-			}
-			_, ok = olinfo[""]
-			olinfo[""] = true //local server
+			uidarr = append(uidarr, conndata.tbl_appdata.ID)
+			platformarr = append(platformarr, conndata.platform)
+
 			if !ok {
 				//if didn't had this id logined on this server
 				//get room user joined and add room info to roomMapLocal
@@ -333,37 +333,23 @@ func loop() {
 					userlist[conndata.tbl_appdata.ID] = true
 				}
 
-				//send event to other server
-				msg := &gtmsg.SMsgUserOnline{Uid: conndata.tbl_appdata.ID, ServerAddr: srvconfig.ServerAddr}
-				sendMsgToExchangeServer(gtmsg.SMsgId_UserOnline, msg)
-
-				// msg := &gtmsg.SMsgUserOnline{Uid: conndata.tbl_appdata.ID, ServerAddr: srvconfig.ServerAddr}
-				// msg.MsgId = gtmsg.SMsgId_UserOnline
-				// msgbytes := Bytes(msg)
-
-				// if broadcastServerEvent(msgbytes) != nil {
-				// 	fmt.Println(err.Error())
-				// 	sess.Stop()
-				// 	continue
-				// }
-
-				err = dbMgr.AddOnlineUser(srvconfig.ServerAddr, conndata.tbl_appdata.ID)
-
-				if err != nil {
-					fmt.Println(err.Error())
-					sess.Stop()
-					continue
-				}
-
 				addAppZoneUid(conndata.tbl_appdata.Appname, conndata.tbl_appdata.Zonename, conndata.tbl_appdata.ID)
 			}
 
 			limitcount++
-			dbMgr.IncrByChatServerClientCount(srvconfig.ServerAddr, 1)
+			//dbMgr.IncrByChatServerClientCount(srvconfig.ServerAddr, 1)
 
-			if limitcount >= 10 {
+			if limitcount >= 100 {
 				break
 			}
+		}
+
+		//send msg to exchange server
+		lenuid := len(uidarr)
+		if lenuid > 0 {
+			msg := &gtmsg.SMsgUserOnline{Uids: uidarr, Platforms: platformarr, ServerAddr: srvconfig.ServerAddr}
+			msgdata, _ := json.Marshal(msg)
+			sendMsgToExchangeServer(gtmsg.SMsgId_UserOnline, msgdata)
 		}
 
 		limitcount = 0
@@ -381,16 +367,33 @@ func loop() {
 			case gtmsg.SMsgId_ServerQuit:
 				isQuit = true
 			case gtmsg.SMsgId_UserOnline:
-				uid := Uint64(data)
-				serveraddr := String(data[8:])
-				// strarr := strings.Split(platformandserver, "#")
-				// //platform := strarr[0]
-				// serveraddr := strarr[1]
-				addOLUser(serveraddr, uid)
-			case gtmsg.SMsgId_UserOffline:
-				uid := Uint64(data)
-				serveraddr := String(data[8:])
-				removeOLUser(serveraddr, uid)
+				// uid := Uint64(data)
+				// serveraddr := String(data[8:])
+				// // strarr := strings.Split(platformandserver, "#")
+				// // //platform := strarr[0]
+				// // serveraddr := strarr[1]
+				// addOLUser(serveraddr, uid)
+
+				msg := &gtmsg.SMsgUserOnline{}
+				err = json.Unmarshal(data, msg)
+				if err == nil {
+					for i, uid := range msg.Uids {
+						platform := msg.Platforms[i]
+
+						sesslist, ok := sessMap[uid]
+						if ok {
+							sess, ok := sesslist[platform]
+							if ok {
+								sess.KickOut()
+								delete(sesslist, platform)
+							}
+						}
+					}
+				}
+			//case gtmsg.SMsgId_UserOffline:
+			// uid := Uint64(data)
+			// serveraddr := String(data[8:])
+			// removeOLUser(serveraddr, uid)
 			case gtmsg.SMsgId_RoomAddUser:
 				rid := Uint64(data)
 				uid := Uint64(data[8:])
@@ -414,53 +417,42 @@ func loop() {
 				if ok {
 					delete(roomMapLocal, rid)
 				}
-			}
-
-			limitcount++
-
-			if limitcount >= 10 {
-				break
-			}
-		}
-
-		limitcount = 0
-		//process server msg
-		for {
-			item, err := serverMsgQueue.Pop()
-			if err != nil {
-				break
-			}
-
-			msg := item.(*ServerMsg)
-			data := msg.Data
-			fmt.Println("processing server msg msgid " + String(msg.Msgid))
-			switch msg.Msgid {
 			case gtmsg.SMsgId_UserMessage:
-				uid := Uint64(data)
-				SendMsgToLocalUid(uid, data[8:])
+				msg := &gtmsg.SMsgUserMessage{}
+				err = json.Unmarshal(data, msg)
+				if err == nil {
+					SendMsgToLocalUid(msg.From, msg.Data)
+					SendMsgToLocalUid(msg.To, msg.Data)
+				}
 			case gtmsg.SMsgId_RoomMessage:
-				rid := Uint64(data)
-				SendMsgToLocalRoom(rid, data[8:])
+				msg := &gtmsg.SMsgRoomMessage{}
+				err = json.Unmarshal(data, msg)
+				if err == nil {
+					SendMsgToLocalRoom(msg.To, msg.Data)
+				}
 			case gtmsg.SMsgId_ZonePublicMessage:
-				len := int(data[0])
-				appname := String(data[1 : 1+len])
-				data = data[1+len:]
-				len = int(data[0])
-				zonename := String(data[1 : 1+len])
-				data = data[1+len:]
-				SendZonePublicMsg(appname, zonename, data)
+				msg := &gtmsg.SMsgZonePublicMessage{}
+				err = json.Unmarshal(data, msg)
+				if err == nil {
+					SendZonePublicMsg(msg.Appname, msg.Zonename, msg.Data)
+				}
 			case gtmsg.SMsgId_AppPublicMessage:
-				len := int(data[0])
-				appname := String(data[1 : 1+len])
-				data = data[1+len:]
-				SendAppPublicMsg(appname, data)
+				msg := &gtmsg.SMsgZonePublicMessage{}
+				err = json.Unmarshal(data, msg)
+				if err == nil {
+					SendAppPublicMsg(msg.Appname, msg.Data)
+				}
 			case gtmsg.SMsgId_ServerPublicMessage:
-				SendServerPublicMsg(data)
+				msg := &gtmsg.SMsgServerPublicMessage{}
+				err = json.Unmarshal(data, msg)
+				if err == nil {
+					SendServerPublicMsg(msg.Data)
+				}
 			}
 
 			limitcount++
 
-			if limitcount >= 10 {
+			if limitcount >= 100 {
 				break
 			}
 		}
@@ -474,6 +466,7 @@ func loop() {
 		}
 
 		//remove sess stoped
+		uidarr = []uint64{}
 		for {
 			item, err := toDeleteSessList.Pop()
 			if err != nil {
@@ -483,6 +476,8 @@ func loop() {
 			sess := item.(ISession)
 			sesslist, ok := sessMap[sess.ID()]
 
+			uidarr = append(uidarr, sess.ID())
+
 			if ok {
 				delete(sesslist, sess.Platform())
 
@@ -491,15 +486,7 @@ func loop() {
 
 					//只有当id对应的sesslist为0时才从userOLMapAll中删除，并且向其它服务器广播id从该服务器彻底离线的event
 					//remove user from userOLMapAll
-					//delete(userOLMapAll, sess.ID())
-					// olinfo, ok := userOLMapAll[sess.ID()]
-					// if ok {
-					// 	delete(olinfo, "")
-					// 	if len(olinfo) == 0 {
-					// 		delete(userOLMapAll, sess.ID())
-					// 	}
-					// }
-					removeOLUser("", sess.ID())
+					//removeOLUser("", sess.ID())
 
 					//get room user joined and add room info to roomMapLocal
 					roomlist, err := dbMgr.GetRoomListByJoined(sess.ID())
@@ -512,16 +499,6 @@ func loop() {
 						userlist, ok := roomMapLocal[room.Rid]
 						if ok {
 							delete(userlist, sess.ID())
-							// flag := true
-							// //check if has room use still on this server
-							// for uid, _ := range userlist {
-							// 	//_, ok := userOLMapAll[uid]
-							// 	_, ok := sessMap[uid]
-							// 	if ok {
-							// 		flag = false
-							// 		break
-							// 	}
-							// }
 
 							if len(userlist) == 0 {
 								delete(roomMapLocal, room.Rid)
@@ -529,32 +506,29 @@ func loop() {
 						}
 					}
 
-					//send event to other server
-					msg := &gtmsg.SMsgUserOffline{Uid: sess.ID(), ServerAddr: srvconfig.ServerAddr}
-					sendMsgToExchangeServer(gtmsg.SMsgId_UserOffline, msg)
-					// msg := &gtmsg.SMsgUserOffline{Uid: sess.ID(), ServerAddr: srvconfig.ServerAddr}
-					// msg.MsgId = gtmsg.SMsgId_UserOffline
-					// msgbytes := Bytes(msg)
-
-					// if broadcastServerEvent(msgbytes) != nil {
-					// 	fmt.Println(err.Error())
-					// 	continue
-					// }
-
-					dbMgr.RemoveOnlineUser(srvconfig.ServerAddr, sess.ID())
+					//dbMgr.RemoveOnlineUser(srvconfig.ServerAddr, sess.ID())
 
 					removeAppZoneUid(sess.AppName(), sess.ZoneName(), sess.ID())
 				}
 			}
 
-			dbMgr.IncrByChatServerClientCount(srvconfig.ServerAddr, -1)
+			//dbMgr.IncrByChatServerClientCount(srvconfig.ServerAddr, -1)
+		}
+
+		//send event to exchange server
+		lenuid = len(uidarr)
+		if lenuid > 0 {
+			msg := &gtmsg.SMsgUserOffline{Uids: uidarr, ServerAddr: srvconfig.ServerAddr}
+			msgdata, _ := json.Marshal(msg)
+			sendMsgToExchangeServer(gtmsg.SMsgId_UserOffline, msgdata)
 		}
 
 		endtime := time.Now().UnixNano()
 		delta := endtime - starttime
-		sleeptime := 20*1000000 - delta
+		sleeptime := 100*1000000 - delta
+		//fmt.Println("starttime:", starttime, "endtime:", endtime, " sleeptime:", sleeptime)
 		if sleeptime > 0 {
-			time.Sleep(time.Duration(sleeptime) * time.Nanosecond)
+			time.Sleep(time.Nanosecond * time.Duration(sleeptime))
 		}
 	}
 }

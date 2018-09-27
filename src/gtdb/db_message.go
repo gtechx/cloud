@@ -138,6 +138,13 @@ func (db *DBManager) SendMsgToUserOffline(to uint64, data []byte) error {
 	return err
 }
 
+func (db *DBManager) SendMsgToUserHistory(to uint64, data []byte) error {
+	conn := db.rd.Get()
+	defer conn.Close()
+	_, err := conn.Do("RPUSH", "message:history:"+String(to), data)
+	return err
+}
+
 func (db *DBManager) AddRoomMsg(rid uint64, msg []byte, timestamp int64) error {
 	conn := db.rd.Get()
 	defer conn.Close()

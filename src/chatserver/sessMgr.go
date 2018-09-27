@@ -79,6 +79,21 @@ func SendMsgToLocalRoom(rid uint64, msg []byte) {
 	}
 }
 
+func SendMsgToLocalRoomAdmin(rid uint64, msg []byte) {
+	roomusers, ok := roomMapLocal[rid]
+	if ok {
+		for uid, _ := range roomusers {
+			sesslist, ok := sessMap[uid]
+
+			if ok {
+				for _, sess := range sesslist {
+					sess.Send(msg)
+				}
+			}
+		}
+	}
+}
+
 func SendZonePublicMsg(appname, zonename string, msg []byte) {
 	zonemap, ok := uidMapAppZone[appname]
 

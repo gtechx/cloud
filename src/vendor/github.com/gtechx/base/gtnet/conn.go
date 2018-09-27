@@ -63,18 +63,11 @@ func (this *Conn) Send(buff []byte) {
 func (this *Conn) startRecv() {
 	quitChan := this.quitChan
 	conn := this.conn
-	for {
-		if this.parser != nil {
-			err := this.parser(conn)
-			if err != nil {
-				if this.listener != nil {
-					this.listener.OnError(1, "Read error:"+err.Error())
-				}
-				// if ne, ok := err.(net.Error); ok && (ne.Temporary() || ne.Timeout()) {
-				// 	//time.Sleep(tempDelay)
-				// 	continue
-				// }
-				break
+	if this.parser != nil {
+		err := this.parser(conn)
+		if err != nil {
+			if this.listener != nil {
+				this.listener.OnError(1, "Read error:"+err.Error())
 			}
 		}
 	}

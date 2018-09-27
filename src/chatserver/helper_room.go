@@ -113,7 +113,9 @@ func addRoomUser(rid, appdataid uint64, presence *MsgRoomPresence, perrcode *uin
 		*perrcode = ERR_DB
 	} else {
 		msg := &gtmsg.SMsgRoomAddUser{Rid: rid, Uid: appdataid}
-		sendMsgToExchangeServer(gtmsg.SMsgId_RoomDimiss, msg)
+		msgdata, _ := json.Marshal(msg)
+		sendMsgToExchangeServer(gtmsg.SMsgId_RoomAddUser, msgdata)
+		return true
 		// msg := &SMsgRoomAddUser{Rid: rid, Uid: appdataid}
 		// msg.MsgId = SMsgId_RoomAddUser
 		// msgbytes := Bytes(msg)
@@ -123,105 +125,105 @@ func addRoomUser(rid, appdataid uint64, presence *MsgRoomPresence, perrcode *uin
 		// 	return false
 		// }
 
-		presencebytes, err := json.Marshal(presence)
-		if err != nil {
-			*perrcode = ERR_INVALID_JSON
-		} else {
-			senddata := packageMsg(RetFrame, 0, MsgId_RoomPresence, presencebytes)
-			userlist, err := dbMgr.GetRoomUserIds(rid)
+		// presencebytes, err := json.Marshal(presence)
+		// if err != nil {
+		// 	*perrcode = ERR_INVALID_JSON
+		// } else {
+		// 	senddata := packageMsg(RetFrame, 0, MsgId_RoomPresence, presencebytes)
+		// 	userlist, err := dbMgr.GetRoomUserIds(rid)
 
-			if err != nil {
-				*perrcode = ERR_DB
-			} else {
-				for _, user := range userlist {
-					//broadcast to user in room
-					errcode := SendMessageToUser(user.Dataid, senddata)
+		// 	if err != nil {
+		// 		*perrcode = ERR_DB
+		// 	} else {
+		// 		for _, user := range userlist {
+		// 			//broadcast to user in room
+		// 			errcode := SendMessageToUser(user.Dataid, senddata)
 
-					if errcode != ERR_NONE {
-						*perrcode = errcode
-						return false
-					}
-				}
+		// 			if errcode != ERR_NONE {
+		// 				*perrcode = errcode
+		// 				return false
+		// 			}
+		// 		}
 
-				return true
-			}
-		}
+		// 		return true
+		// 	}
+		// }
 	}
 
 	return false
 }
 
-func sendMessageToRoomUser(rid uint64, msgbytes []byte, perrcode *uint16) bool {
+// func sendMessageToRoomUser(rid uint64, msgbytes []byte, perrcode *uint16) bool {
 
-	senddata := packageMsg(RetFrame, 0, MsgId_RoomMessage, msgbytes)
-	userlist, err := dbMgr.GetRoomUserIds(rid)
+// 	senddata := packageMsg(RetFrame, 0, MsgId_RoomMessage, msgbytes)
+// 	userlist, err := dbMgr.GetRoomUserIds(rid)
 
-	if err != nil {
-		*perrcode = ERR_DB
-	} else {
-		for _, user := range userlist {
-			//broadcast to user in room
-			errcode := SendMessageToUser(user.Dataid, senddata)
+// 	if err != nil {
+// 		*perrcode = ERR_DB
+// 	} else {
+// 		for _, user := range userlist {
+// 			//broadcast to user in room
+// 			errcode := SendMessageToUser(user.Dataid, senddata)
 
-			if errcode != ERR_NONE {
-				*perrcode = errcode
-				return false
-			}
-		}
+// 			if errcode != ERR_NONE {
+// 				*perrcode = errcode
+// 				return false
+// 			}
+// 		}
 
-		return true
-	}
+// 		return true
+// 	}
 
-	return false
-}
+// 	return false
+// }
 
-func sendPresenceToRoomUser(rid uint64, presencebytes []byte, perrcode *uint16) bool {
+// func sendPresenceToRoomUser(rid uint64, presencebytes []byte, perrcode *uint16) bool {
 
-	senddata := packageMsg(RetFrame, 0, MsgId_RoomPresence, presencebytes)
-	userlist, err := dbMgr.GetRoomUserIds(rid)
+// 	senddata := packageMsg(RetFrame, 0, MsgId_RoomPresence, presencebytes)
+// 	userlist, err := dbMgr.GetRoomUserIds(rid)
 
-	if err != nil {
-		*perrcode = ERR_DB
-	} else {
-		for _, user := range userlist {
-			//broadcast to user in room
-			errcode := SendMessageToUser(user.Dataid, senddata)
+// 	if err != nil {
+// 		*perrcode = ERR_DB
+// 	} else {
+// 		for _, user := range userlist {
+// 			//broadcast to user in room
+// 			errcode := SendMessageToUser(user.Dataid, senddata)
 
-			if errcode != ERR_NONE {
-				*perrcode = errcode
-				return false
-			}
-		}
+// 			if errcode != ERR_NONE {
+// 				*perrcode = errcode
+// 				return false
+// 			}
+// 		}
 
-		return true
-	}
+// 		return true
+// 	}
 
-	return false
-}
+// 	return false
+// }
 
-func sendPresenceToRoomAdmin(rid uint64, presencebytes []byte, perrcode *uint16) bool {
+// func sendPresenceToRoomAdmin(rid uint64, presencebytes []byte, perrcode *uint16) bool {
 
-	senddata := packageMsg(RetFrame, 0, MsgId_RoomPresence, presencebytes)
-	userlist, err := dbMgr.GetRoomAdminIds(rid)
+// 	senddata := packageMsg(RetFrame, 0, MsgId_RoomPresence, presencebytes)
+// 	userlist, err := dbMgr.GetRoomAdminIds(rid)
 
-	if err != nil {
-		*perrcode = ERR_DB
-	} else {
-		for _, user := range userlist {
-			//broadcast to user in room
-			errcode := SendMessageToUser(user.Dataid, senddata)
+// 	if err != nil {
+// 		*perrcode = ERR_DB
+// 	} else {
+// 		for _, user := range userlist {
+// 			//broadcast to user in room
+// 			errcode := SendMessageToUser(user.Dataid, senddata)
 
-			if errcode != ERR_NONE {
-				*perrcode = errcode
-				return false
-			}
-		}
+// 			if errcode != ERR_NONE {
+// 				*perrcode = errcode
+// 				return false
+// 			}
+// 		}
 
-		return true
-	}
+// 		return true
+// 	}
 
-	return false
-}
+// 	return false
+// }
 
 func addRoomPresence(rid, appdataid uint64, presence []byte, perrcode *uint16) bool {
 	err := dbMgr.AddRoomPresence(rid, appdataid, presence)
@@ -285,7 +287,8 @@ func removeRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
 	}
 
 	msg := &gtmsg.SMsgRoomRemoveUser{Rid: rid, Uid: appdataid}
-	sendMsgToExchangeServer(gtmsg.SMsgId_RoomDimiss, msg)
+	msgdata, _ := json.Marshal(msg)
+	sendMsgToExchangeServer(gtmsg.SMsgId_RoomRemoveUser, msgdata)
 	// msg := &SMsgRoomRemoveUser{Rid: rid, Uid: appdataid}
 	// msg.MsgId = SMsgId_RoomRemoveUser
 	// msgbytes := Bytes(msg)

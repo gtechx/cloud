@@ -2,28 +2,30 @@ package main
 
 import (
 	"fmt"
+	"gtmsg"
 	"net"
 
 	//. "github.com/gtechx/base/common"
 	"github.com/gtechx/base/gtnet"
 )
 
+var serverForLoginServer *gtnet.Server
+
 func startLoginServerMonitor() {
-	server := gtnet.NewServer()
-	err := server.Start(srvconfig.ServerNetForChat, srvconfig.ServerAddrForChat, onLoginServerConn)
+	serverForLoginServer = gtnet.NewServer()
+	err := serverForLoginServer.Start(srvconfig.ServerNetForLogin, srvconfig.ServerAddrForLogin, onLoginServerConn)
 	if err != nil {
 		panic(err.Error())
 	}
-	defer server.Stop()
 }
 
 func onLoginServerConn(conn net.Conn) {
-	fmt.Println("new login conn:", conn.RemoteAddr().String())
+	fmt.Println("new loginserver conn:", conn.RemoteAddr().String())
 	loginServerAddChan <- conn
 	defer conn.Close()
 
 	for {
-		msgtype, id, size, msgid, databuff, err := readMsgHeader(conn)
+		msgtype, id, size, msgid, databuff, err := gtmsg.ReadMsgHeader(conn)
 		if err != nil {
 			fmt.Println(err.Error())
 			break
