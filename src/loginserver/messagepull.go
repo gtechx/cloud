@@ -47,6 +47,9 @@ func sendMsgToExchangeServer(msgid uint16, msg interface{}) {
 }
 
 func startMessageSend() {
+	senddata := gtmsg.PackageMsg(gtmsg.ReqFrame, 0, gtmsg.SMsgId_ReqChatServerList, nil)
+	exchangeServerClient.Send(senddata)
+
 	for {
 		timer := time.NewTimer(time.Second * 5)
 
@@ -59,38 +62,46 @@ func startMessageSend() {
 }
 
 func Parser(reader io.Reader) error {
-	fmt.Println("start read...")
+	var ok bool
+	var msgtype byte
+	var id uint16
+	var size uint16
+	var msgid uint16
+	var databuff []byte
+	var err error
+	var mincount int
+	var minserver string
+
 	for {
-		msgtype, id, size, msgid, databuff, err := gtmsg.ReadMsgHeader(reader)
+		msgtype, id, size, msgid, databuff, err = gtmsg.ReadMsgHeader(reader)
 		if err != nil {
 			fmt.Println(err.Error())
 			return err
 		}
 		fmt.Println("new msg msgtype:", msgtype, " id:", id, " size:", size, " msgid:", msgid)
 
-		serverlist := map[string]int{}
-		err = json.Unmarshal(databuff, &serverlist)
+		chatServerMap = map[string]int{}
+		err = json.Unmarshal(databuff, &chatServerMap)
 		if err != nil {
 			fmt.Println(err.Error())
 			continue
 		}
 
-		fmt.Println("serverlist:", serverlist)
-		chatServerMap = map[string]int{}
-		mincount := 9999
-		minserver := ""
-		for saddr, count := range serverlist {
+		fmt.Println("chatServerMap:", chatServerMap)
+		mincount = 9999
+		minserver = ""
+		for saddr, count := range chatServerMap {
 			if count < mincount {
 				mincount = count
 				minserver = saddr
 			}
-			chatServerMap[saddr] = count
 		}
 
-		_, ok := chatServerMap[minUserServer]
+		minUserCount, ok = chatServerMap[minUserServer]
 		if !ok || mincount < minUserCount {
 			minUserCount = mincount
 			minUserServer = minserver
+			//fmt.Println("minUserServer:", minUserServer)
 		}
 	}
 	return nil

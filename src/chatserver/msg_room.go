@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"gtmsg"
 	"time"
 
@@ -59,34 +60,7 @@ func HandlerReqDeleteRoom(sess ISession, data []byte) (uint16, interface{}) {
 	// 	return errcode, errcode
 	// }
 
-	if !deleteRoom(rid, &errcode) {
-		return errcode, errcode
-	}
-
-	//通知房间其他人，房间解散
-	var presence *MsgRoomPresence = &MsgRoomPresence{}
-	presence.PresenceType = PresenceType_Dismiss
-	presence.Rid = rid
-	presence.Who = sess.ID()
-	presence.Nickname = sess.NickName()
-	presence.TimeStamp = time.Now().Unix()
-
-	var presencebytes []byte
-
-	if !jsonMarshal(presence, &presencebytes, &errcode) {
-		return errcode, errcode
-	}
-	//senddata := packageMsg(RetFrame, 0, MsgId_RoomPresence, presencebytes)
-
-	// myid := sess.ID()
-	// for _, user := range uselist {
-	// 	if user.Dataid != myid {
-	// 		SendMessageToUser(user.Dataid, senddata)
-	// 	}
-	// }
-	msg := &gtmsg.SMsgRoomDimiss{Rid: rid}
-	msgdata, _ := json.Marshal(msg)
-	sendMsgToExchangeServer(gtmsg.SMsgId_RoomDimiss, msgdata)
+	deleteRoom(sess.ID(), rid, &errcode)
 
 	return errcode, errcode
 }
@@ -132,12 +106,16 @@ func HandlerReqRoomPresence(sess ISession, data []byte) (uint16, interface{}) {
 				return errcode, errcode
 			}
 
-			if !addRoomPresence(rid, sess.ID(), presencebytes, &errcode) {
+			if !addRoomPresence(rid, sess.ID(), &errcode) {
 				return errcode, errcode
 			}
 
 			// if !sendPresenceToRoomAdmin(rid, presencebytes, &errcode) {
 			// 	return errcode, errcode
+			// }
+			// err := dbMgr.AddUserToRoomApplyList(rid, sess.ID(), time.Now().Unix())
+			// if err != nil {
+			// 	return ERR_DB, ERR_DB
 			// }
 			SendPresenceToRoomAdmin(sess.ID(), rid, presencebytes)
 		} else if roomtype == RoomType_Everyone {
@@ -170,6 +148,14 @@ func HandlerReqRoomPresence(sess ISession, data []byte) (uint16, interface{}) {
 			return errcode, errcode
 		}
 
+		var presencebytes []byte
+		if !jsonMarshal(presence, &presencebytes, &errcode) {
+			return errcode, errcode
+		}
+
+		senddata := packageMsg(RetFrame, 0, MsgId_RoomPresence, presencebytes)
+		errcode = SendPresenceToUser(who, senddata)
+
 		if !removeRoomPresence(rid, who, &errcode) {
 			return errcode, errcode
 		}
@@ -182,20 +168,9 @@ func HandlerReqRoomPresence(sess ISession, data []byte) (uint16, interface{}) {
 			return errcode, errcode
 		}
 
-		if !removeRoomUser(rid, sess.ID(), &errcode) {
+		if !removeRoomUser(rid, sess.ID(), presence, &errcode) {
 			return errcode, errcode
 		}
-
-		var presencebytes []byte
-		if !jsonMarshal(presence, &presencebytes, &errcode) {
-			return errcode, errcode
-		}
-
-		// if !sendPresenceToRoomUser(rid, presencebytes, &errcode) {
-		// 	return errcode, errcode
-		// }
-
-		SendMsgToRoom(sess.ID(), rid, MsgId_Presence, gtmsg.SMsgId_RoomMessage, presencebytes)
 
 		if !removeRoomPresence(rid, sess.ID(), &errcode) {
 			return errcode, errcode
@@ -218,10 +193,8 @@ func HandlerReqRoomPresence(sess ISession, data []byte) (uint16, interface{}) {
 			return errcode, errcode
 		}
 
-		// senddata := packageMsg(RetFrame, 0, MsgId_RoomPresence, presencebytes)
-		// errcode = SendMessageToUser(who, senddata)
-
-		SendMsgToRoom(who, rid, MsgId_Presence, gtmsg.SMsgId_RoomMessage, presencebytes)
+		senddata := packageMsg(RetFrame, 0, MsgId_RoomPresence, presencebytes)
+		errcode = SendPresenceToUser(who, senddata)
 
 		if !removeRoomPresence(rid, who, &errcode) {
 			return errcode, errcode
@@ -299,7 +272,7 @@ func HandlerReqBanRoomUser(sess ISession, data []byte) (uint16, interface{}) {
 		return errcode, errcode
 	}
 
-	removeRoomUser(rid, appdataid, &errcode)
+	banRoomUser(rid, appdataid, &errcode)
 
 	return errcode, errcode
 }
@@ -409,7 +382,7 @@ func HandlerRoomMessage(sess ISession, data []byte) (uint16, interface{}) {
 	// senddata = append(senddata, Bytes(platform)...)
 	// senddata = append(senddata, msgbytes...)
 	timstamp := time.Now().UnixNano()
-	err := dbMgr.AddRoomMsg(roommsg.Rid, msgbytes, timstamp)
+	err := dbMgr.AddRoomMsgHistory(roommsg.Rid, msgbytes, timstamp)
 	if err != nil {
 		return ERR_DB, ERR_DB
 	}
@@ -456,21 +429,21 @@ func SendMsgToRoom(from, rid uint64, msgid, exmsgid uint16, msgbytes []byte) (ui
 	return ERR_NONE, ERR_NONE
 }
 
-// func SendPresenceToRoom(from, rid uint64, msgbytes []byte) (uint16, uint16) {
-// 	senddata := packageMsg(RetFrame, 0, MsgId_Presence, msgbytes)
-// 	// serverlist, err := dbMgr.GetChatServerList()
-// 	// if err != nil {
-// 	// 	return ERR_DB, ERR_DB
-// 	// }
+func SendPresenceToRoom(rid, uid uint64, presencetype uint8, msgbytes []byte) (uint16, uint16) {
+	senddata := packageMsg(RetFrame, 0, MsgId_RoomPresence, msgbytes)
+	// serverlist, err := dbMgr.GetChatServerList()
+	// if err != nil {
+	// 	return ERR_DB, ERR_DB
+	// }
 
-// 	msg := &gtmsg.SMsgRoomMessage{From: from, To: rid, Data: senddata}
-// 	msgdata, _ := json.Marshal(msg)
-// 	sendMsgToExchangeServer(gtmsg.SMsgId_RoomMessage, msgdata)
+	msg := &gtmsg.SMsgRoomPresence{PresenceType: presencetype, Rid: rid, Uid: uid, Data: senddata}
+	msgdata, _ := json.Marshal(msg)
+	sendMsgToExchangeServer(gtmsg.SMsgId_RoomPresence, msgdata)
 
-// 	//send to use on local server and offline users in room
-// 	SendMsgToLocalRoom(rid, senddata)
-// 	return ERR_NONE, ERR_NONE
-// }
+	//send to use on local server and offline users in room
+	SendMsgToLocalRoom(rid, senddata)
+	return ERR_NONE, ERR_NONE
+}
 
 func SendPresenceToRoomAdmin(from, rid uint64, msgbytes []byte) (uint16, uint16) {
 	senddata := packageMsg(RetFrame, 0, MsgId_Presence, msgbytes)
@@ -507,25 +480,34 @@ func HandlerReqRoomPresenceList(sess ISession, data []byte) (uint16, interface{}
 	rid := Uint64(data)
 	errcode := ERR_NONE
 
-	if !isRoomExists(rid, &errcode) {
-		return errcode, errcode
-	}
-	if !isRoomAdmin(rid, sess.ID(), &errcode) {
-		return errcode, errcode
-	}
-	var datalist map[string]string
-	if !getRoomPresenceList(rid, &datalist, &errcode) {
-		return errcode, errcode
-	}
-
-	var msgbytes []byte
-	if !jsonMarshal(datalist, &msgbytes, &errcode) {
-		return errcode, errcode
-	}
-
 	ret := &MsgRetRoomPresenceList{}
-	ret.Json = msgbytes
-	ret.ErrorCode = errcode
+
+	if !isRoomExists(rid, &ret.ErrorCode) {
+		return errcode, ret
+	}
+	if !isRoomAdmin(rid, sess.ID(), &ret.ErrorCode) {
+		return errcode, ret
+	}
+	var uids []uint64
+	if !getRoomPresenceList(rid, &uids, &ret.ErrorCode) {
+		return errcode, ret
+	}
+
+	if len(uids) > 0 {
+		fmt.Println(uids)
+		datalist, err := dbMgr.GetAppDatas(uids)
+		if err != nil {
+			ret.ErrorCode = ERR_DB
+			return ERR_DB, ret
+		}
+
+		var msgbytes []byte
+		if !jsonMarshal(datalist, &msgbytes, &ret.ErrorCode) {
+			return errcode, ret
+		}
+		ret.Json = msgbytes
+	}
+
 	return errcode, ret
 }
 

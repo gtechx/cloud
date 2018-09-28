@@ -51,8 +51,15 @@ func startMessageSend() {
 }
 
 func Parser(reader io.Reader) error {
+	var msgtype byte
+	var id uint16
+	var size uint16
+	var msgid uint16
+	var databuff []byte
+	var err error
+
 	for {
-		msgtype, id, size, msgid, databuff, err := readMsgHeader(reader)
+		msgtype, id, size, msgid, databuff, err = readMsgHeader(reader)
 		if err != nil {
 			fmt.Println("Parser:" + err.Error())
 			return err

@@ -50,6 +50,9 @@ const (
 	PresenceType_Invisible
 
 	PresenceType_Dismiss
+	PresenceType_Ban
+	PresenceType_UnJinyan
+	PresenceType_Jinyan
 )
 
 var msgHandler = map[uint16]func(ISession, []byte) (uint16, interface{}){}

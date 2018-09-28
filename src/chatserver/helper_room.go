@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"gtmsg"
+	"time"
 
 	"gtdb"
 	//. "github.com/gtechx/base/common"
@@ -22,24 +22,23 @@ func createRoom(appdataid uint64, roommsg *MsgReqCreateRoom, perrcode *uint16) b
 	return true
 }
 
-func deleteRoom(rid uint64, perrcode *uint16) bool {
+func deleteRoom(who, rid uint64, perrcode *uint16) bool {
 	err := dbMgr.DeleteRoom(rid)
 	if err != nil {
 		*perrcode = ERR_DB
 		return false
 	}
 
-	msg := &gtmsg.SMsgRoomDimiss{Rid: rid}
-	sendMsgToExchangeServer(gtmsg.SMsgId_RoomDimiss, msg)
-	// msg := &SMsgRoomDimiss{Rid: rid}
-	// msg.MsgId = SMsgId_RoomDimiss
-	// msgbytes := Bytes(msg)
+	presence := &MsgRoomPresence{PresenceType: PresenceType_Dismiss, Rid: rid, Who: who, TimeStamp: time.Now().Unix()}
+	presencebytes, err := json.Marshal(presence)
+	if err != nil {
+		*perrcode = ERR_INVALID_JSON
+	} else {
+		SendPresenceToRoom(rid, who, PresenceType_Dismiss, presencebytes)
+		return true
+	}
 
-	// if broadcastServerEvent(msgbytes) != nil {
-	// 	*perrcode = ERR_DB
-	// 	return false
-	// }
-	return true
+	return false
 }
 
 func getRoomList(appdataid uint64, proomlist *[]*gtdb.Room, perrcode *uint16) bool {
@@ -52,7 +51,7 @@ func getRoomList(appdataid uint64, proomlist *[]*gtdb.Room, perrcode *uint16) bo
 	return true
 }
 
-func getRoomPresenceList(rid uint64, pdatalist *map[string]string, perrcode *uint16) bool {
+func getRoomPresenceList(rid uint64, pdatalist *[]uint64, perrcode *uint16) bool {
 	datalist, err := dbMgr.GetAllRoomPresence(rid)
 	if err != nil {
 		*perrcode = ERR_DB
@@ -112,10 +111,18 @@ func addRoomUser(rid, appdataid uint64, presence *MsgRoomPresence, perrcode *uin
 	if err != nil {
 		*perrcode = ERR_DB
 	} else {
-		msg := &gtmsg.SMsgRoomAddUser{Rid: rid, Uid: appdataid}
-		msgdata, _ := json.Marshal(msg)
-		sendMsgToExchangeServer(gtmsg.SMsgId_RoomAddUser, msgdata)
-		return true
+		presencebytes, err := json.Marshal(presence)
+		if err != nil {
+			*perrcode = ERR_INVALID_JSON
+		} else {
+			SendPresenceToRoom(rid, appdataid, PresenceType_Subscribed, presencebytes)
+			return true
+		}
+
+		// msg := &gtmsg.SMsgRoomAddUser{Rid: rid, Uid: appdataid}
+		// msgdata, _ := json.Marshal(msg)
+		// sendMsgToExchangeServer(gtmsg.SMsgId_RoomAddUser, msgdata)
+
 		// msg := &SMsgRoomAddUser{Rid: rid, Uid: appdataid}
 		// msg.MsgId = SMsgId_RoomAddUser
 		// msgbytes := Bytes(msg)
@@ -225,12 +232,18 @@ func addRoomUser(rid, appdataid uint64, presence *MsgRoomPresence, perrcode *uin
 // 	return false
 // }
 
-func addRoomPresence(rid, appdataid uint64, presence []byte, perrcode *uint16) bool {
-	err := dbMgr.AddRoomPresence(rid, appdataid, presence)
+func addRoomPresence(rid, appdataid uint64, perrcode *uint16) bool {
+	err := dbMgr.AddRoomPresence(rid, appdataid)
 	if err != nil {
 		*perrcode = ERR_DB
 		return false
 	}
+
+	// err = dbMgr.AddUserToRoomApplyList(rid, appdataid, time.Now().Unix())
+	// if err != nil {
+	// 	*perrcode = ERR_DB
+	// 	return false
+	// }
 	return true
 }
 
@@ -240,6 +253,12 @@ func removeRoomPresence(rid, appdataid uint64, perrcode *uint16) bool {
 		*perrcode = ERR_DB
 		return false
 	}
+
+	// err = dbMgr.RemoveUserFromRoomApplyList(rid, appdataid)
+	// if err != nil {
+	// 	*perrcode = ERR_DB
+	// 	return false
+	// }
 	return true
 }
 
@@ -267,7 +286,17 @@ func jinyanRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
 		*perrcode = ERR_DB
 		return false
 	}
-	return true
+
+	presence := &MsgRoomPresence{PresenceType: PresenceType_Jinyan, Rid: rid, Who: appdataid, TimeStamp: time.Now().Unix()}
+	presencebytes, err := json.Marshal(presence)
+	if err != nil {
+		*perrcode = ERR_INVALID_JSON
+	} else {
+		SendPresenceToRoom(rid, appdataid, PresenceType_Jinyan, presencebytes)
+		return true
+	}
+
+	return false
 }
 
 func unjinyanRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
@@ -276,19 +305,52 @@ func unjinyanRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
 		*perrcode = ERR_DB
 		return false
 	}
-	return true
+
+	presence := &MsgRoomPresence{PresenceType: PresenceType_UnJinyan, Rid: rid, Who: appdataid, TimeStamp: time.Now().Unix()}
+	presencebytes, err := json.Marshal(presence)
+	if err != nil {
+		*perrcode = ERR_INVALID_JSON
+	} else {
+		SendPresenceToRoom(rid, appdataid, PresenceType_UnJinyan, presencebytes)
+		return true
+	}
+	return false
 }
 
-func removeRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
+func banRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
 	err := dbMgr.RemoveRoomUser(rid, appdataid)
 	if err != nil {
 		*perrcode = ERR_DB
 		return false
 	}
 
-	msg := &gtmsg.SMsgRoomRemoveUser{Rid: rid, Uid: appdataid}
-	msgdata, _ := json.Marshal(msg)
-	sendMsgToExchangeServer(gtmsg.SMsgId_RoomRemoveUser, msgdata)
+	presence := &MsgRoomPresence{PresenceType: PresenceType_Ban, Rid: rid, Who: appdataid, TimeStamp: time.Now().Unix()}
+	presencebytes, err := json.Marshal(presence)
+	if err != nil {
+		*perrcode = ERR_INVALID_JSON
+	} else {
+		SendPresenceToRoom(rid, appdataid, PresenceType_UnSubscribe, presencebytes)
+		return true
+	}
+
+	return false
+}
+
+func removeRoomUser(rid, appdataid uint64, presence *MsgRoomPresence, perrcode *uint16) bool {
+	err := dbMgr.RemoveRoomUser(rid, appdataid)
+	if err != nil {
+		*perrcode = ERR_DB
+		return false
+	}
+
+	presencebytes, err := json.Marshal(presence)
+	if err != nil {
+		*perrcode = ERR_INVALID_JSON
+	} else {
+		SendPresenceToRoom(rid, appdataid, PresenceType_UnSubscribe, presencebytes)
+		return true
+	}
+
 	// msg := &SMsgRoomRemoveUser{Rid: rid, Uid: appdataid}
 	// msg.MsgId = SMsgId_RoomRemoveUser
 	// msgbytes := Bytes(msg)
@@ -297,7 +359,7 @@ func removeRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
 	// 	*perrcode = ERR_DB
 	// 	return false
 	// }
-	return true
+	return false
 }
 
 func isRoomPassword(rid uint64, password string, perrcode *uint16) bool {

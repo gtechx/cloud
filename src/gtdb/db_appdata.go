@@ -87,6 +87,20 @@ func (db *DBManager) GetAppData(id uint64) (*AppData, error) {
 	return tbl_appdata, retdb.Error
 }
 
+func (db *DBManager) GetAppDatas(ids []uint64) ([]*AppData, error) {
+	tbl_appdata := []*AppData{}
+	retdb := db.sql.Model(appdata_table)
+	for i, id := range ids {
+		if i == 0 {
+			retdb = retdb.Where("id = ?", ids[0])
+		} else {
+			retdb = retdb.Or("id = ?", id)
+		}
+	}
+	retdb = retdb.Scan(&tbl_appdata)
+	return tbl_appdata, retdb.Error
+}
+
 func (db *DBManager) GetAppDataByAccount(account, appname string) (*AppData, error) {
 	tbl_appdata := &AppData{}
 	retdb := db.sql.Where("account = ?", account).Where("appname = ?", appname).First(tbl_appdata)
@@ -335,3 +349,36 @@ func (db *DBManager) GetAccountZoneList(account, appname string) ([]*AccountZone
 	retdb := db.sql.Where("account = ?", account).Where("appname = ?", appname).Find(&accountzonelist)
 	return accountzonelist, retdb.Error
 }
+
+func (db *DBManager) SetUserLastMsgTime(uid uint64, timestamp int64) error {
+	retdb := db.sql.Model(appdata_table).Where("uid = ?", uid).Update("lastmsgtime", timestamp)
+	return retdb.Error
+}
+
+func (db *DBManager) GetUserLastMsgTime(uid uint64) (int64, error) {
+	tbl_appdata := &AppData{}
+	retdb := db.sql.Model(appdata_table).Where("uid = ?", uid).Select("lastmsgtime").Scan(tbl_appdata)
+	return tbl_appdata.Lastmsgtime, retdb.Error
+}
+
+// func (db *DBManager) SetUserLastPresenceTime(uid uint64, timestamp int64) error {
+// 	retdb := db.sql.Model(appdata_table).Where("uid = ?", uid).Update("lastpresencetime", timestamp)
+// 	return retdb.Error
+// }
+
+// func (db *DBManager) GetUserLastPresenceTime(uid uint64) (int64, error) {
+// 	tbl_appdata := &AppData{}
+// 	retdb := db.sql.Model(appdata_table).Where("uid = ?", uid).Select("lastpresencetime").Scan(tbl_appdata)
+// 	return tbl_appdata.Lastpresencetime, retdb.Error
+// }
+
+// func (db *DBManager) SetUserPresenceAckTime(uid uint64, timestamp int64) error {
+// 	retdb := db.sql.Model(appdata_table).Where("uid = ?", uid).Update("presenceacktime", timestamp)
+// 	return retdb.Error
+// }
+
+// func (db *DBManager) GetUserPresenceAckTime(uid uint64) (int64, error) {
+// 	tbl_appdata := &AppData{}
+// 	retdb := db.sql.Model(appdata_table).Where("uid = ?", uid).Select("presenceacktime").Scan(tbl_appdata)
+// 	return tbl_appdata.Presenceacktime, retdb.Error
+// }

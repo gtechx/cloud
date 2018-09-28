@@ -20,10 +20,18 @@ func startChatServerMonitor() {
 }
 
 func onChatServerConn(conn net.Conn) {
-	fmt.Println("new chatserver conn:", conn.RemoteAddr().String())
+	var msgtype byte
+	var id uint16
+	var size uint16
+	var msgid uint16
+	var databuff []byte
+	var err error
+
+	remoteaddr := conn.RemoteAddr().String()
+	fmt.Println("new chatserver conn:", remoteaddr)
 	//check ip
 
-	msgtype, id, size, msgid, databuff, err := gtmsg.ReadMsgHeader(conn)
+	msgtype, id, size, msgid, databuff, err = gtmsg.ReadMsgHeader(conn)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -38,7 +46,7 @@ func onChatServerConn(conn net.Conn) {
 	defer conn.Close()
 
 	for {
-		msgtype, id, size, msgid, databuff, err := gtmsg.ReadMsgHeader(conn)
+		msgtype, id, size, msgid, databuff, err = gtmsg.ReadMsgHeader(conn)
 		if err != nil {
 			fmt.Println(err.Error())
 			break
@@ -48,4 +56,5 @@ func onChatServerConn(conn net.Conn) {
 	}
 
 	chatServerRemoveChan <- chatserver
+	fmt.Println("chatserver:" + remoteaddr + " closed")
 }

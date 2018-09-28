@@ -131,25 +131,41 @@ type SMsgUserOffline struct {
 	ServerAddr string   `json:"serveraddr"` //use # connect platform and serveraddr
 }
 
-const SMsgId_RoomAddUser uint16 = 10010
+const SMsgId_RoomPresence uint16 = 10010
 
-type SMsgRoomAddUser struct {
-	Rid uint64 `json:"rid"`
-	Uid uint64 `json:"uid"`
+type SMsgRoomPresence struct {
+	PresenceType uint8  `json:"presencetype"`
+	Rid          uint64 `json:"rid"`
+	Uid          uint64 `json:"uid"`
+	Data         []byte `json:"data"`
 }
 
-const SMsgId_RoomRemoveUser uint16 = 10015
+const SMsgId_UserPresence uint16 = 10015
 
-type SMsgRoomRemoveUser struct {
-	Rid uint64 `json:"rid"`
-	Uid uint64 `json:"uid"`
+type SMsgUserPresence struct {
+	To   uint64 `json:"to"`
+	Data []byte `json:"data"`
 }
 
-const SMsgId_RoomDimiss uint16 = 10020
+// const SMsgId_RoomAddUser uint16 = 10010
 
-type SMsgRoomDimiss struct {
-	Rid uint64 `json:"rid"`
-}
+// type SMsgRoomAddUser struct {
+// 	Rid uint64 `json:"rid"`
+// 	Uid uint64 `json:"uid"`
+// }
+
+// const SMsgId_RoomRemoveUser uint16 = 10015
+
+// type SMsgRoomRemoveUser struct {
+// 	Rid uint64 `json:"rid"`
+// 	Uid uint64 `json:"uid"`
+// }
+
+// const SMsgId_RoomDimiss uint16 = 10020
+
+// type SMsgRoomDimiss struct {
+// 	Rid uint64 `json:"rid"`
+// }
 
 const SMsgId_ServerQuit uint16 = 10025
 

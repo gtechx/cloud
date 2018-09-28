@@ -105,11 +105,49 @@ func SendMessageToUser(from, to uint64, data []byte) uint16 {
 	msgdata, _ := json.Marshal(msg)
 	sendMsgToExchangeServer(gtmsg.SMsgId_UserMessage, msgdata)
 
+	ts := time.Now().Unix()
 	//add to message history
-	err := dbMgr.SendMsgToUserHistory(to, data)
+	err := dbMgr.AddUserMsgHistory(to, ts, data)
 	if err != nil {
 		return ERR_DB
 	}
+
+	err = dbMgr.SetUserLastMsgTime(to, ts)
+	if err != nil {
+		return ERR_DB
+	}
+
+	return ERR_NONE
+}
+
+func SendPresenceToUser(to uint64, data []byte) uint16 {
+	sesslist, ok := sessMap[to]
+
+	if ok {
+		for _, sess := range sesslist {
+			sess.Send(data)
+		}
+	}
+
+	msg := &gtmsg.SMsgUserPresence{To: to, Data: data}
+	msgdata, _ := json.Marshal(msg)
+	sendMsgToExchangeServer(gtmsg.SMsgId_UserPresence, msgdata)
+
+	ts := time.Now().Unix()
+	err := dbMgr.AddUserMsgHistory(to, ts, data)
+	if err != nil {
+		return ERR_DB
+	}
+
+	err = dbMgr.SetUserLastMsgTime(to, ts)
+	if err != nil {
+		return ERR_DB
+	}
+
+	// err = dbMgr.SetUserLastPresenceTime(to, ts)
+	// if err != nil {
+	// 	return ERR_DB
+	// }
 
 	return ERR_NONE
 }
@@ -187,12 +225,12 @@ func HandlerPresence(sess ISession, data []byte) (uint16, interface{}) {
 							errcode = ERR_INVALID_JSON
 						} else {
 							senddata := packageMsg(RetFrame, 0, MsgId_Presence, presencebytes)
-							err = dbMgr.AddPresence(sess.ID(), who, presencebytes)
+							err = dbMgr.AddPresence(sess.ID(), who)
 							if err != nil {
 								errcode = ERR_DB
 							} else {
 								//send to who
-								errcode = SendMessageToUser(sess.ID(), who, senddata)
+								errcode = SendPresenceToUser(who, senddata)
 								// if errcode != ERR_NONE {
 
 								// }
@@ -221,7 +259,7 @@ func HandlerPresence(sess ISession, data []byte) (uint16, interface{}) {
 								errcode = ERR_INVALID_JSON
 							} else {
 								senddata := packageMsg(RetFrame, 0, MsgId_Presence, presencebytes)
-								errcode = SendMessageToUser(sess.ID(), who, senddata)
+								errcode = SendPresenceToUser(who, senddata)
 								dbMgr.RemovePresence(sess.ID(), who)
 							}
 						}
@@ -245,7 +283,7 @@ func HandlerPresence(sess ISession, data []byte) (uint16, interface{}) {
 								errcode = ERR_INVALID_JSON
 							} else {
 								senddata := packageMsg(RetFrame, 0, MsgId_Presence, presencebytes)
-								errcode = SendMessageToUser(sess.ID(), who, senddata)
+								errcode = SendPresenceToUser(who, senddata)
 							}
 						}
 					}
@@ -264,7 +302,7 @@ func HandlerPresence(sess ISession, data []byte) (uint16, interface{}) {
 							errcode = ERR_INVALID_JSON
 						} else {
 							senddata := packageMsg(RetFrame, 0, MsgId_Presence, presencebytes)
-							errcode = SendMessageToUser(sess.ID(), who, senddata)
+							errcode = SendPresenceToUser(who, senddata)
 							dbMgr.RemovePresence(sess.ID(), who)
 						}
 					}
@@ -325,34 +363,34 @@ func HandlerReqDataList(sess ISession, data []byte) (uint16, interface{}) {
 			}
 		}
 	case DataType_Presence:
-		list, err := dbMgr.GetAllPresence(sess.ID())
-		if err != nil {
-			errcode = ERR_DB
-		} else {
-			fmt.Println(list)
-			presencelist := []*MsgPresence{}
-			for _, presstr := range list {
-				var pres *MsgPresence = &MsgPresence{}
-				presdata := []byte(presstr)
-				err = json.Unmarshal(presdata, pres)
-				if err != nil {
-					errcode = ERR_DB
-					break
-				}
-				presencelist = append(presencelist, pres)
-			}
+		// list, err := dbMgr.GetAllPresence(sess.ID())
+		// if err != nil {
+		// 	errcode = ERR_DB
+		// } else {
+		// 	fmt.Println(list)
+		// 	presencelist := []*MsgPresence{}
+		// 	for _, presstr := range list {
+		// 		var pres *MsgPresence = &MsgPresence{}
+		// 		presdata := []byte(presstr)
+		// 		err = json.Unmarshal(presdata, pres)
+		// 		if err != nil {
+		// 			errcode = ERR_DB
+		// 			break
+		// 		}
+		// 		presencelist = append(presencelist, pres)
+		// 	}
 
-			if err != nil {
-				errcode = ERR_DB
-			} else {
-				ret.Json, err = json.Marshal(presencelist)
-				fmt.Println(string(ret.Json))
-				if err != nil {
-					errcode = ERR_UNKNOWN
-					ret.Json = nil
-				}
-			}
-		}
+		// 	if err != nil {
+		// 		errcode = ERR_DB
+		// 	} else {
+		// 		ret.Json, err = json.Marshal(presencelist)
+		// 		fmt.Println(string(ret.Json))
+		// 		if err != nil {
+		// 			errcode = ERR_UNKNOWN
+		// 			ret.Json = nil
+		// 		}
+		// 	}
+		// }
 	case DataType_Black:
 		blacklist, err := dbMgr.GetBlackInfoList(sess.ID())
 		if err != nil {

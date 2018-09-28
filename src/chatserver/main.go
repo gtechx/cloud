@@ -24,8 +24,9 @@ var quit chan os.Signal
 //var userOLMapAll = map[uint64]map[string]string{} //{uid1:{ios:serveraddr, pc:serveraddr}}
 var userOLMapAll = map[uint64]map[string]bool{} //{uid1:{serveraddr1:true, serveraddr2:true}} //所有服登录用户
 
-var sessMap = map[uint64]map[string]ISession{}              //{uid:{web:sess, ios:sess, android:sess}} //本地登录用户
-var roomMapLocal = map[uint64]map[uint64]bool{}             //{rid:{uid1:true, uid2:true}} //本地登录用户所在房间 //need optimize
+var sessMap = map[uint64]map[string]ISession{}  //{uid:{web:sess, ios:sess, android:sess}} //本地登录用户
+var roomMapLocal = map[uint64]map[uint64]bool{} //{rid:{uid1:true, uid2:true}} //本地登录用户所在房间 //need optimize
+var roomAdminMapLocal = map[uint64]map[uint64]bool{}
 var uidMapAppZone = map[string]map[string]map[uint64]bool{} //{appname:{zonename:{uid1:true, uid2:true}}}
 
 type ConnData struct {
@@ -238,38 +239,66 @@ func removeOLUser(serveraddr string, uid uint64) {
 	}
 }
 
-func broadcastServerEvent(msgbytes []byte) error {
-	serverlist, err := dbMgr.GetChatServerList()
+func addOLRoomUser(uid uint64) error {
+	roomlist, err := dbMgr.GetRoomListByJoined(uid)
+
 	if err != nil {
 		return err
 	}
 
-	for _, serveraddr := range serverlist {
-		if serveraddr == srvconfig.ServerAddr {
-			continue
+	for _, room := range roomlist {
+		userlist, ok := roomMapLocal[room.Rid]
+		if !ok {
+			userlist = map[uint64]bool{}
+			roomMapLocal[room.Rid] = userlist
 		}
-		err = dbMgr.SendServerEvent(serveraddr, msgbytes)
+		userlist[uid] = true
+
+		ok, err = dbMgr.IsRoomAdmin(room.Rid, uid)
 		if err != nil {
 			return err
+		}
+
+		if ok {
+			userlist, ok = roomAdminMapLocal[room.Rid]
+			if !ok {
+				userlist = map[uint64]bool{}
+				roomAdminMapLocal[room.Rid] = userlist
+			}
+			userlist[uid] = true
 		}
 	}
 
 	return nil
 }
 
-func broadcastServerMsg(msgbytes []byte) error {
-	serverlist, err := dbMgr.GetChatServerList()
+func removeOLRoomUser(uid uint64) error {
+	roomlist, err := dbMgr.GetRoomListByJoined(uid)
+
 	if err != nil {
 		return err
 	}
 
-	for _, serveraddr := range serverlist {
-		if serveraddr == srvconfig.ServerAddr {
-			continue
+	for _, room := range roomlist {
+		userlist, ok := roomMapLocal[room.Rid]
+		if ok {
+			delete(userlist, uid)
+
+			if len(userlist) == 0 {
+				delete(roomMapLocal, room.Rid)
+			}
 		}
-		err = dbMgr.SendMsgToServer(serveraddr, msgbytes)
-		if err != nil {
-			return err
+
+		userlist, ok = roomAdminMapLocal[room.Rid]
+		if ok {
+			_, ok = userlist[uid]
+			if ok {
+				delete(userlist, uid)
+
+				if len(userlist) == 0 {
+					delete(roomAdminMapLocal, room.Rid)
+				}
+			}
 		}
 	}
 
@@ -306,31 +335,10 @@ func loop() {
 			if !ok {
 				//if didn't had this id logined on this server
 				//get room user joined and add room info to roomMapLocal
-				roomlist, err := dbMgr.GetRoomListByJoined(conndata.tbl_appdata.ID)
-
-				if err != nil {
+				if err = addOLRoomUser(conndata.tbl_appdata.ID); err != nil {
 					fmt.Println(err.Error())
 					sess.Stop()
 					continue
-				}
-
-				for _, room := range roomlist {
-					userlist, ok := roomMapLocal[room.Rid]
-					if !ok {
-						userlist = map[uint64]bool{}
-						roomMapLocal[room.Rid] = userlist
-
-						// users, err := dbMgr.GetRoomUserIds(room.Rid)
-
-						// if err != nil {
-						// 	continue
-						// }
-
-						// for _, user := range users {
-						// 	userlist[user.Dataid] = true
-						// }
-					}
-					userlist[conndata.tbl_appdata.ID] = true
 				}
 
 				addAppZoneUid(conndata.tbl_appdata.Appname, conndata.tbl_appdata.Zonename, conndata.tbl_appdata.ID)
@@ -374,6 +382,7 @@ func loop() {
 				// // serveraddr := strarr[1]
 				// addOLUser(serveraddr, uid)
 
+				//kickout same platform for same uid
 				msg := &gtmsg.SMsgUserOnline{}
 				err = json.Unmarshal(data, msg)
 				if err == nil {
@@ -394,28 +403,39 @@ func loop() {
 			// uid := Uint64(data)
 			// serveraddr := String(data[8:])
 			// removeOLUser(serveraddr, uid)
-			case gtmsg.SMsgId_RoomAddUser:
-				rid := Uint64(data)
-				uid := Uint64(data[8:])
-				roomusers, ok := roomMapLocal[rid]
-				if ok {
-					roomusers[uid] = true
-				}
-			case gtmsg.SMsgId_RoomRemoveUser:
-				rid := Uint64(data)
-				uid := Uint64(data[8:])
-				roomusers, ok := roomMapLocal[rid]
-				if ok {
-					_, ok := roomusers[uid]
-					if ok {
-						delete(roomusers, uid)
+			case gtmsg.SMsgId_RoomPresence:
+				msg := &gtmsg.SMsgRoomPresence{}
+				err = json.Unmarshal(data, msg)
+				if err == nil {
+					switch msg.PresenceType {
+					case PresenceType_Subscribed:
+						roomusers, ok := roomMapLocal[msg.Rid]
+						if ok {
+							roomusers[msg.Uid] = true
+						}
+					case PresenceType_UnSubscribe:
+						roomusers, ok := roomMapLocal[msg.Rid]
+						if ok {
+							_, ok := roomusers[msg.Uid]
+							if ok {
+								delete(roomusers, msg.Uid)
+							}
+						}
+					case PresenceType_Jinyan:
+					case PresenceType_Ban:
+					case PresenceType_Dismiss:
+						_, ok := roomMapLocal[msg.Rid]
+						if ok {
+							delete(roomMapLocal, msg.Rid)
+						}
 					}
+					SendMsgToLocalRoom(msg.Rid, msg.Data)
 				}
-			case gtmsg.SMsgId_RoomDimiss:
-				rid := Uint64(data)
-				_, ok := roomMapLocal[rid]
-				if ok {
-					delete(roomMapLocal, rid)
+			case gtmsg.SMsgId_UserPresence:
+				msg := &gtmsg.SMsgUserPresence{}
+				err = json.Unmarshal(data, msg)
+				if err == nil {
+					SendMsgToLocalUid(msg.To, msg.Data)
 				}
 			case gtmsg.SMsgId_UserMessage:
 				msg := &gtmsg.SMsgUserMessage{}
@@ -447,6 +467,12 @@ func loop() {
 				err = json.Unmarshal(data, msg)
 				if err == nil {
 					SendServerPublicMsg(msg.Data)
+				}
+			case gtmsg.SMsgId_RoomAdminMessage:
+				msg := &gtmsg.SMsgRoomAdminMessage{}
+				err = json.Unmarshal(data, msg)
+				if err == nil {
+					SendMsgToLocalRoomAdmin(msg.To, msg.Data)
 				}
 			}
 
@@ -489,21 +515,9 @@ func loop() {
 					//removeOLUser("", sess.ID())
 
 					//get room user joined and add room info to roomMapLocal
-					roomlist, err := dbMgr.GetRoomListByJoined(sess.ID())
-
-					if err != nil {
+					if err = removeOLRoomUser(sess.ID()); err != nil {
+						fmt.Println(err.Error())
 						continue
-					}
-
-					for _, room := range roomlist {
-						userlist, ok := roomMapLocal[room.Rid]
-						if ok {
-							delete(userlist, sess.ID())
-
-							if len(userlist) == 0 {
-								delete(roomMapLocal, room.Rid)
-							}
-						}
 					}
 
 					//dbMgr.RemoveOnlineUser(srvconfig.ServerAddr, sess.ID())

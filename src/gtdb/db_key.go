@@ -309,22 +309,25 @@ type AppChatChannel struct {
 }
 
 type AppData struct {
-	ID        uint64    `redis:"id" json:"id,string" gorm:"primary_key;AUTO_INCREMENT"`
-	Account   string    `redis:"account" json:"account"`
-	Appname   string    `redis:"appname" json:"appname"`
-	Zonename  string    `redis:"zonename" json:"zonename"`
-	Vendor    string    `redis:"vendor" json:"vendor"`
-	Nickname  string    `redis:"nickname" json:"nickname"`
-	Desc      string    `redis:"desc" json:"desc"`
-	Sex       string    `redis:"sex" json:"sex"`
-	Birthday  time.Time `redis:"birthday" json:"birthday"`
-	Country   string    `redis:"country" json:"country"`
-	Isbaned   bool      `redis:"isbaned" json:"isbaned" gorm:"tinyint(1);default:0"`
-	Isjinyan  bool      `redis:"isjinyan" json:"isjinyan" gorm:"tinyint(1);default:0"`
-	Regip     string    `redis:"regip" json:"regip"`
-	Lastip    string    `redis:"lastip" json:"lastip"`
-	Lastlogin time.Time `redis:"lastlogin" json:"lastlogin"`
-	CreatedAt time.Time `redis:"createdate" json:"createdate"`
+	ID          uint64    `redis:"id" json:"id,string" gorm:"primary_key;AUTO_INCREMENT"`
+	Account     string    `redis:"account" json:"account"`
+	Appname     string    `redis:"appname" json:"appname"`
+	Zonename    string    `redis:"zonename" json:"zonename"`
+	Vendor      string    `redis:"vendor" json:"vendor"`
+	Nickname    string    `redis:"nickname" json:"nickname"`
+	Desc        string    `redis:"desc" json:"desc"`
+	Sex         string    `redis:"sex" json:"sex"`
+	Birthday    time.Time `redis:"birthday" json:"birthday"`
+	Country     string    `redis:"country" json:"country"`
+	Isbaned     bool      `redis:"isbaned" json:"isbaned" gorm:"tinyint(1);default:0"`
+	Isjinyan    bool      `redis:"isjinyan" json:"isjinyan" gorm:"tinyint(1);default:0"`
+	Regip       string    `redis:"regip" json:"regip"`
+	Lastip      string    `redis:"lastip" json:"lastip"`
+	Lastlogin   time.Time `redis:"lastlogin" json:"lastlogin"`
+	CreatedAt   time.Time `redis:"createdate" json:"createdate"`
+	Lastmsgtime int64     `redis:"lastmsgtime" json:"lastmsgtime,string"`
+	//Lastpresencetime int64     `redis:"lastpresencetime" json:"lastpresencetime,string"`
+	//Presenceacktime  int64     `redis:"presenceacktime" json:"presenceacktime,string"`
 
 	Onlines []Online `json:"-" gorm:"foreignkey:Dataid;association_foreignkey:ID"`
 	Friends []Friend `json:"-" gorm:"foreignkey:Dataid;association_foreignkey:ID"`

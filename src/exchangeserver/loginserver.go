@@ -20,12 +20,20 @@ func startLoginServerMonitor() {
 }
 
 func onLoginServerConn(conn net.Conn) {
-	fmt.Println("new loginserver conn:", conn.RemoteAddr().String())
+	var msgtype byte
+	var id uint16
+	var size uint16
+	var msgid uint16
+	var databuff []byte
+	var err error
+
+	remoteaddr := conn.RemoteAddr().String()
+	fmt.Println("new loginserver conn:", remoteaddr)
 	loginServerAddChan <- conn
 	defer conn.Close()
 
 	for {
-		msgtype, id, size, msgid, databuff, err := gtmsg.ReadMsgHeader(conn)
+		msgtype, id, size, msgid, databuff, err = gtmsg.ReadMsgHeader(conn)
 		if err != nil {
 			fmt.Println(err.Error())
 			break
@@ -35,4 +43,5 @@ func onLoginServerConn(conn net.Conn) {
 	}
 
 	loginServerRemoveChan <- conn
+	fmt.Println("loginserver:" + remoteaddr + " closed")
 }

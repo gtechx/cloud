@@ -34,35 +34,35 @@ import (
 func (db *DBManager) IsPresenceExists(id, from uint64) (bool, error) {
 	conn := db.rd.Get()
 	defer conn.Close()
-	ret, err := conn.Do("HEXISTS", "presence:"+String(id), from)
+	ret, err := conn.Do("EXISTS", "user:presence:"+String(id)+":"+String(from))
 	return redis.Bool(ret, err)
 }
 
-func (db *DBManager) AddPresence(from, to uint64, msg []byte) error {
+func (db *DBManager) AddPresence(from, to uint64) error {
 	conn := db.rd.Get()
 	defer conn.Close()
-	_, err := conn.Do("HSET", "presence:"+String(to), from, msg) //记录到目的地用户presence列表
+	_, err := conn.Do("SET", "user:presence:"+String(to)+":"+String(from), "EX", 60*60*24*7) //记录到目的地用户presence列表
 	return err
 }
 
 func (db *DBManager) RemovePresence(id, from uint64) error {
 	conn := db.rd.Get()
 	defer conn.Close()
-	_, err := conn.Do("HDEL", "presence:"+String(id), from)
+	_, err := conn.Do("DEL", "user:presence:"+String(id)+":"+String(from))
 	return err
 }
 
-func (db *DBManager) GetAllPresence(id uint64) (map[string]string, error) {
-	conn := db.rd.Get()
-	defer conn.Close()
-	ret, err := conn.Do("HGETALL", "presence:"+String(id))
-	return redis.StringMap(ret, err) //.ByteSlices(ret, err)
-}
+// func (db *DBManager) GetAllPresence(id uint64) (map[string]string, error) {
+// 	conn := db.rd.Get()
+// 	defer conn.Close()
+// 	ret, err := conn.Do("HGETALL", "user:presence:"+String(id))
+// 	return redis.StringMap(ret, err) //.ByteSlices(ret, err)
+// }
 
-func (db *DBManager) AddRoomPresence(rid, appdataid uint64, msg []byte) error {
+func (db *DBManager) AddRoomPresence(rid, appdataid uint64) error {
 	conn := db.rd.Get()
 	defer conn.Close()
-	_, err := conn.Do("HSET", "roompresence:"+String(rid), appdataid, msg)
+	_, err := conn.Do("SADD", "room:presence:"+String(rid), appdataid)
 	//_, err := conn.Do("SET", "roompresence:"+String(rid)+":"+String(appdataid), "", "ex 259200") //记录到目的地用户presence列表
 	return err
 }
@@ -70,22 +70,32 @@ func (db *DBManager) AddRoomPresence(rid, appdataid uint64, msg []byte) error {
 func (db *DBManager) RemoveRoomPresence(rid, appdataid uint64) error {
 	conn := db.rd.Get()
 	defer conn.Close()
-	_, err := conn.Do("HDEL", "roompresence:"+String(rid), appdataid)
+	_, err := conn.Do("SREM", "room:presence:"+String(rid), appdataid)
 	//_, err := conn.Do("DEL", "roompresence:"+String(rid)+":"+String(appdataid))
 	return err
 }
 
-func (db *DBManager) GetAllRoomPresence(rid uint64) (map[string]string, error) {
+func (db *DBManager) GetAllRoomPresence(rid uint64) ([]uint64, error) {
 	conn := db.rd.Get()
 	defer conn.Close()
-	ret, err := conn.Do("HGETALL", "roompresence:"+String(rid))
-	return redis.StringMap(ret, err) //.ByteSlices(ret, err)
+	uids := []uint64{}
+
+	ret, err := conn.Do("SMEMBERS", "room:presence:"+String(rid))
+	if err != nil {
+		return uids, err
+	}
+	retarr, err := redis.Values(ret, err)
+	if err != nil {
+		return uids, err
+	}
+	err = redis.ScanSlice(retarr, &uids)
+	return uids, err //.ByteSlices(ret, err)
 }
 
 func (db *DBManager) IsRoomPresenceExists(rid, appdataid uint64) (bool, error) {
 	conn := db.rd.Get()
 	defer conn.Close()
-	ret, err := conn.Do("HEXISTS", "roompresence:"+String(rid), appdataid)
+	ret, err := conn.Do("SISMEMBER", "room:presence:"+String(rid), appdataid)
 	//ret, err := conn.Do("EXISTS", "roompresence:"+String(rid)+":"+String(appdataid))
 	return redis.Bool(ret, err)
 }
@@ -138,19 +148,61 @@ func (db *DBManager) SendMsgToUserOffline(to uint64, data []byte) error {
 	return err
 }
 
-func (db *DBManager) SendMsgToUserHistory(to uint64, data []byte) error {
+func (db *DBManager) AddUserMsgHistory(to uint64, timestamp int64, data []byte) error {
 	conn := db.rd.Get()
 	defer conn.Close()
-	_, err := conn.Do("RPUSH", "message:history:"+String(to), data)
+	_, err := conn.Do("ZADD", "user:message:history:"+String(to), timestamp, data)
 	return err
 }
 
-func (db *DBManager) AddRoomMsg(rid uint64, msg []byte, timestamp int64) error {
+func (db *DBManager) GetUserMsgHistory(to uint64, mintimestamp int64) ([][]byte, error) {
 	conn := db.rd.Get()
 	defer conn.Close()
-	_, err := conn.Do("ZADD", "room:message:"+String(rid), msg)
+	ret, err := conn.Do("ZREVRANGEBYSCORE ", "user:message:history:"+String(to), "+inf", mintimestamp, "LIMIT", 0, 100)
+	return redis.ByteSlices(ret, err)
+}
+
+// func (db *DBManager) AddUserPresenceHistory(to uint64, timestamp int64, data []byte) error {
+// 	conn := db.rd.Get()
+// 	defer conn.Close()
+// 	_, err := conn.Do("ZADD", "user:presence:history:"+String(to), timestamp, data)
+// 	return err
+// }
+
+// func (db *DBManager) GetUserPresenceHistory(to uint64, mintimestamp int64) ([][]byte, error) {
+// 	conn := db.rd.Get()
+// 	defer conn.Close()
+// 	ret, err := conn.Do("ZREVRANGEBYSCORE ", "user:presence:history:"+String(to), "+inf", mintimestamp, "LIMIT", 0, 100)
+// 	return redis.ByteSlices(ret, err)
+// }
+
+func (db *DBManager) AddRoomMsgHistory(rid uint64, msg []byte, timestamp int64) error {
+	conn := db.rd.Get()
+	defer conn.Close()
+	_, err := conn.Do("ZADD", "room:message:history:"+String(rid), timestamp, msg)
 	return err
 }
+
+func (db *DBManager) GetRoomMsgHistory(rid uint64, mintimestamp int64) ([][]byte, error) {
+	conn := db.rd.Get()
+	defer conn.Close()
+	ret, err := conn.Do("ZREVRANGEBYSCORE ", "room:message:history:"+String(rid), "+inf", mintimestamp, "LIMIT", 0, 100)
+	return redis.ByteSlices(ret, err)
+}
+
+// func (db *DBManager) AddUserToRoomApplyList(rid, uid uint64, timestamp int64) error {
+// 	conn := db.rd.Get()
+// 	defer conn.Close()
+// 	_, err := conn.Do("ZADD", "room:apply:list:"+String(rid), timestamp, uid)
+// 	return err
+// }
+
+// func (db *DBManager) RemoveUserFromRoomApplyList(rid, uid uint64) error {
+// 	conn := db.rd.Get()
+// 	defer conn.Close()
+// 	_, err := conn.Do("ZREM", "room:apply:list:"+String(rid), uid)
+// 	return err
+// }
 
 func (db *DBManager) SaveLoginToken(account, token string, timeout int) error {
 	conn := db.rd.Get()

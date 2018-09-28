@@ -1,0 +1,39 @@
+ <div>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item">
+          <div class="row bg-light" style="height:64px;">
+            <img class="h-100 mr-1" src="/static/img/avatar5.png" />
+            <div class="pull-right">
+              <div>
+                Count Dracula
+              </div>
+              <div>How have you been? I was...</div>
+            </div>
+          </div>
+        </li>
+        <li class="list-group-item">
+          <div class="row bg-light" style="height:64px;">
+            <img class="h-100 mr-1" src="/static/img/avatar5.png" />
+            <div class="pull-right">
+              <div>
+                Count Dracula
+              </div>
+              <div>How have you been? I was...</div>
+            </div>
+          </div>
+        </li>
+        <li class="list-group-item">
+          <div class="row bg-light" style="height:64px;">
+            <img class="h-100 mr-1" src="/static/img/avatar5.png" />
+            <div class="pull-right">
+              <div>
+                Count Dracula
+              </div>
+              <div>How have you been? I was...</div>
+            </div>
+          </div>
+        </li>
+        <!-- End Contact Item -->
+      </ul>
+      <!-- /.contatcts-list -->
+    </div>

@@ -26,9 +26,9 @@ func CreateSess(conn net.Conn, tbl_appdata *gtdb.AppData, platform string) ISess
 func DelSess(sess ISession) {
 	sesslist := GetSess(sess.ID())
 	platform := sess.Platform()
-	tmpsess, ok := sesslist[platform]
+
 	//增加判断sess == sesslist[sess.Platform()],防止顶号的时候删除sess出问题
-	if sesslist != nil && ok && sess == tmpsess.(ISession) {
+	if sesslist != nil {
 		delete(sesslist, platform)
 
 		if len(sesslist) == 0 {
@@ -80,7 +80,7 @@ func SendMsgToLocalRoom(rid uint64, msg []byte) {
 }
 
 func SendMsgToLocalRoomAdmin(rid uint64, msg []byte) {
-	roomusers, ok := roomMapLocal[rid]
+	roomusers, ok := roomAdminMapLocal[rid]
 	if ok {
 		for uid, _ := range roomusers {
 			sesslist, ok := sessMap[uid]

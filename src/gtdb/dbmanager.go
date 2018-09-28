@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
-	//. "github.com/gtechx/base/common"
+	. "github.com/gtechx/base/common"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
@@ -262,19 +262,22 @@ func (db *DBManager) CreateTestData(tx *gorm.DB) error {
 		return err
 	}
 
-	tbl_account = &Account{Account: "wyq2", Password: "edf06a849c9ec19ea725bd3c6c4ce225", Salt: "p99U86", Regip: "127.0.0.1"}
-	if err = tx.Create(tbl_account).Error; err != nil {
-		return err
-	}
-
 	tbl_appdata := &AppData{Appname: "test1", Zonename: "aaa", Account: "wyq", Nickname: "wyqtest", Regip: "127.0.0.1"}
 	if err = db.CreateTestAppData(tx, tbl_appdata); err != nil {
 		return err
 	}
 
-	tbl_appdata = &AppData{Appname: "test1", Zonename: "aaa", Account: "wyq2", Nickname: "wyq2test", Regip: "127.0.0.1"}
-	if err = db.CreateTestAppData(tx, tbl_appdata); err != nil {
-		return err
+	for i := 2; i < 10; i++ {
+		account := "wyq" + String(i)
+		tbl_account = &Account{Account: account, Password: "edf06a849c9ec19ea725bd3c6c4ce225", Salt: "p99U86", Regip: "127.0.0.1"}
+		if err = tx.Create(tbl_account).Error; err != nil {
+			return err
+		}
+
+		tbl_appdata = &AppData{Appname: "test1", Zonename: "aaa", Account: account, Nickname: account + "Name", Regip: "127.0.0.1"}
+		if err = db.CreateTestAppData(tx, tbl_appdata); err != nil {
+			return err
+		}
 	}
 
 	return nil

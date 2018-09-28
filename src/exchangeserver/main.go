@@ -180,6 +180,8 @@ func loop() {
 				if err == nil {
 					broadcastMsgToOtherChatServer(msg.Server, gtmsg.SMsgId_UserMessage, data)
 				}
+			default:
+				broadcastMsgToOtherChatServer(msg.Server, msg.Msgid, data)
 			}
 		}
 
