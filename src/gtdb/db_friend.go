@@ -11,20 +11,6 @@ var friend_tablelist = []*Friend{}
 var group_table = &Group{}
 var group_tablelist = []*Group{}
 
-// func (db *DBManager) AddFriendRequest(id, otherid uint64, group string) error {
-// 	conn := db.rd.Get()
-// 	defer conn.Close()
-// 	_, err := conn.Do("HSET", keyJoin("hset:app:data:friend:request", id), otherid, group)
-// 	return err
-// }
-
-// func (db *DBManager) RemoveFriendRequest(id, otherid uint64) error {
-// 	conn := db.rd.Get()
-// 	defer conn.Close()
-// 	_, err := conn.Do("HDEL", keyJoin("hset:app:data:friend:request", id), otherid)
-// 	return err
-// }
-
 func (db *DBManager) AddFriend(tbl_from, tbl_to *Friend) error {
 	// retdb := db.sql.Create(tbl_friend)
 	// return retdb.Error

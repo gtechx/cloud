@@ -195,11 +195,18 @@ func loop() {
 			//data := msg.Data
 			switch msg.Msgid {
 			case gtmsg.SMsgId_ReqChatServerList:
-				retdata := genChatServerList()
-				//fmt.Println("processing loginserver msg msgid " + String(msg.Msgid))
-				//fmt.Println("ret data:" + string(retdata))
-				senddata := gtmsg.PackageMsg(gtmsg.RetFrame, 0, gtmsg.SMsgId_ReqChatServerList, retdata)
-				msg.LoginConn.Write(senddata)
+				t1 := time.Now().UnixNano()
+				tmpdata := []byte{}
+				for i := 0; i < 100000; i++ {
+					retdata := genChatServerList()
+					//fmt.Println("processing loginserver msg msgid " + String(msg.Msgid))
+					//fmt.Println("ret data:" + string(retdata))
+					senddata := gtmsg.PackageMsg(gtmsg.RetFrame, 0, gtmsg.SMsgId_ReqChatServerList, retdata)
+					//msg.LoginConn.Write(senddata)
+					tmpdata = append(tmpdata, senddata...)
+				}
+				t2 := time.Now().UnixNano()
+				fmt.Println("t1:", t1, "t2:", t2, " delta:", t2-t1)
 			}
 		}
 

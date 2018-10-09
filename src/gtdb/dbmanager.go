@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	//"github.com/garyburd/redigo/redis"
+	"github.com/go-redis/redis"
 	. "github.com/gtechx/base/common"
 
 	"github.com/jinzhu/gorm"
@@ -28,7 +29,7 @@ type config struct {
 }
 
 type Redis struct {
-	*redis.Pool
+	*redis.Client
 
 	serverAddr     string
 	serverPassword string
@@ -40,49 +41,48 @@ func (rdm *Redis) Initialize(saddr, spass string, defaultdb uint64) error {
 	rdm.serverPassword = spass
 	rdm.defaultDB = defaultdb
 
-	rdm.Pool = &redis.Pool{
-		MaxIdle:      3,
-		IdleTimeout:  240 * time.Second,
-		Dial:         rdm.redisDial,
-		TestOnBorrow: rdm.redisOnBorrow,
-	}
+	rdm.Client = redis.NewClient(&redis.Options{
+		Addr:     saddr,
+		Password: spass,          // no password set
+		DB:       int(defaultdb), // use default DB
+	})
 
 	return nil
 }
 
 func (rdm *Redis) UnInitialize() error {
 	var err error
-	if rdm.Pool != nil {
-		err = rdm.Pool.Close()
+	if rdm.Client != nil {
+		err = rdm.Client.Close()
 	}
 	return err
 }
 
-func (rdm *Redis) redisDial() (redis.Conn, error) {
-	c, err := redis.Dial("tcp", rdm.serverAddr)
-	if err != nil {
-		return nil, err
-	}
-	if rdm.serverPassword != "" {
-		if _, err := c.Do("AUTH", rdm.serverPassword); err != nil {
-			c.Close()
-			return nil, err
-		}
-	}
-	if _, err := c.Do("SELECT", rdm.defaultDB); err != nil {
-		c.Close()
-		return nil, err
-	}
-	return c, nil
-}
+// func (rdm *Redis) redisDial() (redis.Conn, error) {
+// 	c, err := redis.Dial("tcp", rdm.serverAddr)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if rdm.serverPassword != "" {
+// 		if _, err := c.Do("AUTH", rdm.serverPassword); err != nil {
+// 			c.Close()
+// 			return nil, err
+// 		}
+// 	}
+// 	if _, err := c.Do("SELECT", rdm.defaultDB); err != nil {
+// 		c.Close()
+// 		return nil, err
+// 	}
+// 	return c, nil
+// }
 
-func (rdm *Redis) redisOnBorrow(c redis.Conn, t time.Time) error {
-	if time.Since(t) < time.Minute {
-		return nil
-	}
-	_, err := c.Do("PING")
-	return err
-}
+// func (rdm *Redis) redisOnBorrow(c redis.Conn, t time.Time) error {
+// 	if time.Since(t) < time.Minute {
+// 		return nil
+// 	}
+// 	_, err := c.Do("PING")
+// 	return err
+// }
 
 type Mysql struct {
 	*gorm.DB
@@ -193,13 +193,15 @@ func (db *DBManager) UnInitialize() error {
 }
 
 func (db *DBManager) Install() error {
-	conn := db.rd.Get()
-	defer conn.Close()
+	// conn := db.rd.Get()
+	// defer conn.Close()
 
-	_, err := conn.Do("FLUSHDB")
+	// _, err := conn.Do("FLUSHDB")
+	ret := db.rd.FlushDB()
+	var err error
 
-	if err != nil {
-		return err
+	if ret.Err() != nil {
+		return ret.Err()
 	}
 
 	tx := db.sql.Begin()

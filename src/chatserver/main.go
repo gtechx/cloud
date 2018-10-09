@@ -611,7 +611,7 @@ func onNewConn(conn net.Conn) {
 			if err != nil {
 				errcode = ERR_DB
 			} else {
-				jsonUnMarshal(userdata, tbl_appdata, &errcode)
+				jsonUnMarshal([]byte(userdata), tbl_appdata, &errcode)
 				fmt.Println("uid:", tbl_appdata.ID, " logined success")
 			}
 		}

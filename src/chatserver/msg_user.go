@@ -240,11 +240,11 @@ func HandlerPresence(sess ISession, data []byte) (uint16, interface{}) {
 				}
 			case PresenceType_Subscribed:
 				//check if server has record, if not omit this message, else send to record sender
-				flag, err = dbMgr.IsPresenceExists(sess.ID(), who)
+				ret, err := dbMgr.IsPresenceExists(sess.ID(), who)
 				if err != nil {
 					errcode = ERR_DB
 				} else {
-					if !flag {
+					if ret == 0 {
 						errcode = ERR_PRESENCE_NOT_EXISTS
 					} else {
 						tbl_from := &gtdb.Friend{Dataid: who, Otherdataid: sess.ID(), Groupname: srvconfig.DefaultGroupName}
@@ -290,11 +290,11 @@ func HandlerPresence(sess ISession, data []byte) (uint16, interface{}) {
 				}
 			case PresenceType_UnSubscribed:
 				//check if server has record, if not omit this message, else send to record sender
-				flag, err = dbMgr.IsPresenceExists(sess.ID(), who)
+				ret, err := dbMgr.IsPresenceExists(sess.ID(), who)
 				if err != nil {
 					errcode = ERR_DB
 				} else {
-					if !flag {
+					if ret == 0 {
 						errcode = ERR_PRESENCE_NOT_EXISTS
 					} else {
 						presencebytes, err := json.Marshal(presence)
@@ -404,33 +404,33 @@ func HandlerReqDataList(sess ISession, data []byte) (uint16, interface{}) {
 			}
 		}
 	case DataType_Offline_Message:
-		list, err := dbMgr.GetOfflineMessage(sess.ID())
-		if err != nil {
-			errcode = ERR_DB
-		} else {
-			//msglist := []*MsgMessage{}
-			for _, msgdata := range list {
-				// var pres *MsgMessage
-				// err = json.Unmarshal(msgdata[7:], &pres)
-				// if err != nil {
-				// 	errcode = ERR_DB
-				// 	break
-				// }
-				// msglist = append(msglist, pres)
-				sess.Send(msgdata)
-			}
+		// list, err := dbMgr.GetOfflineMessage(sess.ID())
+		// if err != nil {
+		// 	errcode = ERR_DB
+		// } else {
+		// 	//msglist := []*MsgMessage{}
+		// 	for _, msgdata := range list {
+		// 		// var pres *MsgMessage
+		// 		// err = json.Unmarshal(msgdata[7:], &pres)
+		// 		// if err != nil {
+		// 		// 	errcode = ERR_DB
+		// 		// 	break
+		// 		// }
+		// 		// msglist = append(msglist, pres)
+		// 		sess.Send(msgdata)
+		// 	}
 
-			// if err != nil {
-			// 	errcode = ERR_DB
-			// } else {
-			// 	ret.Json, err = json.Marshal(msglist)
-			// 	if err != nil {
-			// 		errcode = ERR_UNKNOWN
-			// 		ret.Json = nil
-			// 	}
-			// }
-			return errcode, nil
-		}
+		// 	// if err != nil {
+		// 	// 	errcode = ERR_DB
+		// 	// } else {
+		// 	// 	ret.Json, err = json.Marshal(msglist)
+		// 	// 	if err != nil {
+		// 	// 		errcode = ERR_UNKNOWN
+		// 	// 		ret.Json = nil
+		// 	// 	}
+		// 	// }
+		// 	return errcode, nil
+		// }
 	}
 
 	ret.ErrorCode = errcode
