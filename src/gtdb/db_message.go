@@ -240,3 +240,91 @@ func (db *DBManager) GetLoginToken(account string) (string, error) {
 	ret := db.rd.Get("token:" + account)
 	return ret.Result()
 }
+
+func (db *DBManager) PubUserMsg(uid uint64, data []byte) error {
+	ret := db.rd.Publish("user:msg:"+String(uid), data)
+	return ret.Err()
+}
+
+func (db *DBManager) SubUserMsg(uid uint64) <-chan *redis.Message {
+	ret := db.rd.Subscribe("user:msg:" + String(uid))
+	return ret.Channel()
+}
+
+func (db *DBManager) GetUserSubNum(uid uint64) (int64, error) {
+	key := "user:msg:" + String(uid)
+	ret := db.rd.PubSubNumSub(key)
+	err := ret.Err()
+
+	if err != nil {
+		return -1, err
+	}
+
+	return ret.Val()[key], nil
+}
+
+func (db *DBManager) PubRoomMsg(rid uint64, data []byte) error {
+	ret := db.rd.Publish("room:msg:"+String(rid), data)
+	return ret.Err()
+}
+
+func (db *DBManager) SubRoomMsg(rid uint64) <-chan *redis.Message {
+	ret := db.rd.Subscribe("room:msg:" + String(rid))
+	return ret.Channel()
+}
+
+func (db *DBManager) GetRoomSubNum(rid uint64) (int64, error) {
+	key := "room:msg:" + String(rid)
+	ret := db.rd.PubSubNumSub(key)
+	err := ret.Err()
+
+	if err != nil {
+		return -1, err
+	}
+
+	return ret.Val()[key], nil
+}
+
+func (db *DBManager) PubAppMsg(appname string, data []byte) error {
+	ret := db.rd.Publish("app:msg:"+appname, data)
+	return ret.Err()
+}
+
+func (db *DBManager) SubAppMsg(appname string) <-chan *redis.Message {
+	ret := db.rd.Subscribe("app:msg:" + appname)
+	return ret.Channel()
+}
+
+func (db *DBManager) GetAppSubNum(appname string) (int64, error) {
+	key := "app:msg:" + appname
+	ret := db.rd.PubSubNumSub(key)
+	err := ret.Err()
+
+	if err != nil {
+		return -1, err
+	}
+
+	return ret.Val()[key], nil
+}
+
+func (db *DBManager) PubAppZoneMsg(appname, zonename string, data []byte) error {
+	ret := db.rd.Publish("app:zone:msg:"+appname+":"+zonename, data)
+	return ret.Err()
+}
+
+func (db *DBManager) SubAppZoneMsg(appname, zonename string) <-chan *redis.Message {
+	ret := db.rd.Subscribe("app:zone:msg:" + appname + ":" + zonename)
+	return ret.Channel()
+}
+
+func (db *DBManager) GetAppZoneSubNum(appname, zonename string) (int64, error) {
+	key := "app:zone:msg:" + appname + ":" + zonename
+	ret := db.rd.PubSubNumSub(key)
+	err := ret.Err()
+
+	if err != nil {
+		return -1, err
+	}
+
+	return ret.Val()[key], nil
+}
