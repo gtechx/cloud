@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"gtdb"
-	"gtmsg"
 	"time"
 
 	. "github.com/gtechx/base/common"
@@ -93,26 +92,33 @@ func SendMessageToSelfExceptMe(sess ISession, data []byte) uint16 {
 }
 
 func SendMessageToUser(from, to uint64, data []byte) uint16 {
-	sesslist, ok := sessMap[to]
+	// sesslist, ok := sessMap[to]
 
-	if ok {
-		for _, sess := range sesslist {
-			sess.Send(data)
-		}
-	}
+	// if ok {
+	// 	for _, sess := range sesslist {
+	// 		sess.Send(data)
+	// 	}
+	// }
 
-	msg := &gtmsg.SMsgUserMessage{ServerAddr: srvconfig.ServerAddr, From: from, To: to, Data: data}
-	msgdata, _ := json.Marshal(msg)
-	sendMsgToExchangeServer(gtmsg.SMsgId_UserMessage, msgdata)
+	// msg := &gtmsg.SMsgUserMessage{ServerAddr: srvconfig.ServerAddr, From: from, To: to, Data: data}
+	// msgdata, _ := json.Marshal(msg)
+	// sendMsgToExchangeServer(gtmsg.SMsgId_UserMessage, msgdata)
 
+	//TODO:三条消息是否可以合并到一条，都存储到redis上？
 	ts := time.Now().Unix()
 	//add to message history
-	err := dbMgr.AddUserMsgHistory(to, ts, data)
+	err := dbMgr.AddUserMsgHistory(ts, data, from, to)
 	if err != nil {
 		return ERR_DB
 	}
 
 	err = dbMgr.SetUserLastMsgTime(to, ts)
+	if err != nil {
+		return ERR_DB
+	}
+
+	err = dbMgr.PubUserMsg(to, data)
+
 	if err != nil {
 		return ERR_DB
 	}
@@ -121,25 +127,31 @@ func SendMessageToUser(from, to uint64, data []byte) uint16 {
 }
 
 func SendPresenceToUser(to uint64, data []byte) uint16 {
-	sesslist, ok := sessMap[to]
+	// sesslist, ok := sessMap[to]
 
-	if ok {
-		for _, sess := range sesslist {
-			sess.Send(data)
-		}
-	}
+	// if ok {
+	// 	for _, sess := range sesslist {
+	// 		sess.Send(data)
+	// 	}
+	// }
 
-	msg := &gtmsg.SMsgUserPresence{To: to, Data: data}
-	msgdata, _ := json.Marshal(msg)
-	sendMsgToExchangeServer(gtmsg.SMsgId_UserPresence, msgdata)
+	// msg := &gtmsg.SMsgUserPresence{To: to, Data: data}
+	// msgdata, _ := json.Marshal(msg)
+	// sendMsgToExchangeServer(gtmsg.SMsgId_UserPresence, msgdata)
 
 	ts := time.Now().Unix()
-	err := dbMgr.AddUserMsgHistory(to, ts, data)
+	err := dbMgr.AddUserMsgHistory(ts, data, to)
 	if err != nil {
 		return ERR_DB
 	}
 
 	err = dbMgr.SetUserLastMsgTime(to, ts)
+	if err != nil {
+		return ERR_DB
+	}
+
+	err = dbMgr.PubUserMsg(to, data)
+
 	if err != nil {
 		return ERR_DB
 	}
@@ -479,7 +491,7 @@ func HandlerMessage(sess ISession, data []byte) (uint16, interface{}) {
 					} else {
 						senddata := packageMsg(RetFrame, 0, MsgId_Message, msgbytes)
 						errcode = SendMessageToUser(sess.ID(), msg.To, senddata)
-						errcode = SendMessageToSelfExceptMe(sess, senddata)
+						//errcode = SendMessageToSelfExceptMe(sess, senddata)
 					}
 				}
 			}

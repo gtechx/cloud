@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"gtmsg"
 	"time"
@@ -402,30 +401,18 @@ func SendMsgToRoom(from, rid uint64, msgid, exmsgid uint16, msgbytes []byte) (ui
 	// 	return ERR_DB, ERR_DB
 	// }
 
-	msg := &gtmsg.SMsgRoomMessage{From: from, To: rid, Data: senddata}
-	msgdata, _ := json.Marshal(msg)
-	sendMsgToExchangeServer(exmsgid, msgdata)
-	// msg := &SMsgRoomMessage{}
-	// msg.MsgId = SMsgId_RoomMessage
-	// msg.Rid = rid
-	// msg.Data = senddata //append(Bytes(who), msgbytes...)
-	// for _, serveraddr := range serverlist {
-	// 	if serveraddr == srvconfig.ServerAddr {
-	// 		continue
-	// 	}
-	// 	//broadcast to other servers
-	// 	err = dbMgr.SendMsgToServer(Bytes(msg), serveraddr)
-	// 	if err != nil {
-	// 		return ERR_DB, ERR_DB
-	// 	}
-	// }
-	// err := broadcastServerMsg(Bytes(msg))
-	// if err != nil {
-	// 	return ERR_DB, ERR_DB
-	// }
+	// msg := &gtmsg.SMsgRoomMessage{From: from, To: rid, Data: senddata}
+	// msgdata, _ := json.Marshal(msg)
+	// sendMsgToExchangeServer(exmsgid, msgdata)
+
+	err := dbMgr.PubRoomMsg(rid, senddata)
+
+	if err != nil {
+		return ERR_DB, ERR_DB
+	}
 
 	//send to use on local server and offline users in room
-	SendMsgToLocalRoom(rid, senddata)
+	//SendMsgToLocalRoom(rid, senddata)
 	return ERR_NONE, ERR_NONE
 }
 
@@ -436,24 +423,35 @@ func SendPresenceToRoom(rid, uid uint64, presencetype uint8, msgbytes []byte) (u
 	// 	return ERR_DB, ERR_DB
 	// }
 
-	msg := &gtmsg.SMsgRoomPresence{PresenceType: presencetype, Rid: rid, Uid: uid, Data: senddata}
-	msgdata, _ := json.Marshal(msg)
-	sendMsgToExchangeServer(gtmsg.SMsgId_RoomPresence, msgdata)
+	// msg := &gtmsg.SMsgRoomPresence{PresenceType: presencetype, Rid: rid, Uid: uid, Data: senddata}
+	// msgdata, _ := json.Marshal(msg)
+	// sendMsgToExchangeServer(gtmsg.SMsgId_RoomPresence, msgdata)
+	err := dbMgr.PubRoomMsg(rid, senddata)
+
+	if err != nil {
+		return ERR_DB, ERR_DB
+	}
 
 	//send to use on local server and offline users in room
-	SendMsgToLocalRoom(rid, senddata)
+	//SendMsgToLocalRoom(rid, senddata)
 	return ERR_NONE, ERR_NONE
 }
 
 func SendPresenceToRoomAdmin(from, rid uint64, msgbytes []byte) (uint16, uint16) {
 	senddata := packageMsg(RetFrame, 0, MsgId_Presence, msgbytes)
 
-	msg := &gtmsg.SMsgRoomAdminMessage{From: from, To: rid, Data: senddata}
-	msgdata, _ := json.Marshal(msg)
-	sendMsgToExchangeServer(gtmsg.SMsgId_RoomAdminMessage, msgdata)
+	// msg := &gtmsg.SMsgRoomAdminMessage{From: from, To: rid, Data: senddata}
+	// msgdata, _ := json.Marshal(msg)
+	// sendMsgToExchangeServer(gtmsg.SMsgId_RoomAdminMessage, msgdata)
+
+	err := dbMgr.PubRoomAdminMsg(rid, senddata)
+
+	if err != nil {
+		return ERR_DB, ERR_DB
+	}
 
 	//send to use on local server and offline users in room
-	SendMsgToLocalRoomAdmin(rid, senddata)
+	//SendMsgToLocalRoomAdmin(rid, senddata)
 	return ERR_NONE, ERR_NONE
 }
 

@@ -141,13 +141,13 @@ func (db *DBManager) SaveChatLoginToken(token string, databytes []byte, timeout 
 	return ret.Err()
 }
 
-func (db *DBManager) GetChatToken(token string) (string, error) {
+func (db *DBManager) GetChatToken(token string) ([]byte, error) {
 	// conn := db.rd.Get()
 	// defer conn.Close()
 	// ret, err := conn.Do("GET", "chattoken:"+token)
 	// return redis.Bytes(ret, err)
 	ret := db.rd.Get("chattoken:" + token)
-	return ret.Val(), ret.Err()
+	return ret.Bytes()
 }
 
 // func (db *DBManager) UpdateChatServerUserTTL(serveraddr string, seconds int) error {

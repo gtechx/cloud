@@ -160,7 +160,7 @@ func main() {
 	defer server.Stop()
 	defer dbMgr.ClearOnlineInfo(srvconfig.ServerAddr)
 
-	sendMsgToExchangeServer(0, []byte(srvconfig.ServerAddr))
+	//sendMsgToExchangeServer(0, []byte(srvconfig.ServerAddr))
 
 	//msg from other server monitor
 	messagePullStart()
@@ -316,8 +316,8 @@ func loop() {
 
 		limitcount := 0
 		//create sess for new user
-		uidarr := []uint64{}
-		platformarr := []string{}
+		// uidarr := []uint64{}
+		// platformarr := []string{}
 		for {
 			item, err := newConnList.Pop()
 			if err != nil {
@@ -329,8 +329,8 @@ func loop() {
 			sess := CreateSess(conndata.conn, conndata.tbl_appdata, conndata.platform)
 			sess.Start()
 
-			uidarr = append(uidarr, conndata.tbl_appdata.ID)
-			platformarr = append(platformarr, conndata.platform)
+			// uidarr = append(uidarr, conndata.tbl_appdata.ID)
+			// platformarr = append(platformarr, conndata.platform)
 
 			if !ok {
 				//if didn't had this id logined on this server
@@ -353,12 +353,12 @@ func loop() {
 		}
 
 		//send msg to exchange server
-		lenuid := len(uidarr)
-		if lenuid > 0 {
-			msg := &gtmsg.SMsgUserOnline{Uids: uidarr, Platforms: platformarr, ServerAddr: srvconfig.ServerAddr}
-			msgdata, _ := json.Marshal(msg)
-			sendMsgToExchangeServer(gtmsg.SMsgId_UserOnline, msgdata)
-		}
+		// lenuid := len(uidarr)
+		// if lenuid > 0 {
+		// 	msg := &gtmsg.SMsgUserOnline{Uids: uidarr, Platforms: platformarr, ServerAddr: srvconfig.ServerAddr}
+		// 	msgdata, _ := json.Marshal(msg)
+		// 	sendMsgToExchangeServer(gtmsg.SMsgId_UserOnline, msgdata)
+		// }
 
 		limitcount = 0
 		//process server event
@@ -492,7 +492,7 @@ func loop() {
 		}
 
 		//remove sess stoped
-		uidarr = []uint64{}
+		//uidarr = []uint64{}
 		for {
 			item, err := toDeleteSessList.Pop()
 			if err != nil {
@@ -502,7 +502,7 @@ func loop() {
 			sess := item.(ISession)
 			sesslist, ok := sessMap[sess.ID()]
 
-			uidarr = append(uidarr, sess.ID())
+			//uidarr = append(uidarr, sess.ID())
 
 			if ok {
 				delete(sesslist, sess.Platform())
@@ -530,12 +530,12 @@ func loop() {
 		}
 
 		//send event to exchange server
-		lenuid = len(uidarr)
-		if lenuid > 0 {
-			msg := &gtmsg.SMsgUserOffline{Uids: uidarr, ServerAddr: srvconfig.ServerAddr}
-			msgdata, _ := json.Marshal(msg)
-			sendMsgToExchangeServer(gtmsg.SMsgId_UserOffline, msgdata)
-		}
+		// lenuid = len(uidarr)
+		// if lenuid > 0 {
+		// 	msg := &gtmsg.SMsgUserOffline{Uids: uidarr, ServerAddr: srvconfig.ServerAddr}
+		// 	msgdata, _ := json.Marshal(msg)
+		// 	sendMsgToExchangeServer(gtmsg.SMsgId_UserOffline, msgdata)
+		// }
 
 		endtime := time.Now().UnixNano()
 		delta := endtime - starttime
@@ -611,7 +611,7 @@ func onNewConn(conn net.Conn) {
 			if err != nil {
 				errcode = ERR_DB
 			} else {
-				jsonUnMarshal([]byte(userdata), tbl_appdata, &errcode)
+				jsonUnMarshal(userdata, tbl_appdata, &errcode)
 				fmt.Println("uid:", tbl_appdata.ID, " logined success")
 			}
 		}

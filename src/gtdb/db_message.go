@@ -159,13 +159,23 @@ func (db *DBManager) SendMsgToUserOffline(to uint64, data []byte) error {
 	return ret.Err()
 }
 
-func (db *DBManager) AddUserMsgHistory(to uint64, timestamp int64, data []byte) error {
+func (db *DBManager) AddUserMsgHistory(timestamp int64, data []byte, uids ...uint64) error {
 	// conn := db.rd.Get()
 	// defer conn.Close()
 	// _, err := conn.Do("ZADD", "user:message:history:"+String(to), timestamp, data)
 	// return err
-	ret := db.rd.ZAdd("user:message:history:"+String(to), redis.Z{Score: float64(timestamp), Member: data})
-	return ret.Err()
+	// ret := db.rd.ZAdd("user:message:history:"+String(to), redis.Z{Score: float64(timestamp), Member: data})
+	// return ret.Err()
+	pipe := db.rd.TxPipeline()
+	z := redis.Z{Score: float64(timestamp), Member: data}
+	for _, uid := range uids {
+		pipe.ZAdd("user:message:history:"+String(uid), z)
+	}
+	// pipe.ZAdd("user:message:history:"+String(from), z)
+	// pipe.ZAdd("user:message:history:"+String(to), z)
+	//pipe.Publish("user:msg:"+String(to), data)
+	_, err := pipe.Exec()
+	return err
 }
 
 func (db *DBManager) GetUserMsgHistory(to uint64, mintimestamp int64) ([]string, error) {
@@ -275,6 +285,28 @@ func (db *DBManager) SubRoomMsg(rid uint64) <-chan *redis.Message {
 
 func (db *DBManager) GetRoomSubNum(rid uint64) (int64, error) {
 	key := "room:msg:" + String(rid)
+	ret := db.rd.PubSubNumSub(key)
+	err := ret.Err()
+
+	if err != nil {
+		return -1, err
+	}
+
+	return ret.Val()[key], nil
+}
+
+func (db *DBManager) PubRoomAdminMsg(rid uint64, data []byte) error {
+	ret := db.rd.Publish("room:admin:msg:"+String(rid), data)
+	return ret.Err()
+}
+
+func (db *DBManager) SubRoomAdminMsg(rid uint64) <-chan *redis.Message {
+	ret := db.rd.Subscribe("room:admin:msg:" + String(rid))
+	return ret.Channel()
+}
+
+func (db *DBManager) GetRoomAdminSubNum(rid uint64) (int64, error) {
+	key := "room:admin:msg:" + String(rid)
 	ret := db.rd.PubSubNumSub(key)
 	err := ret.Err()
 
