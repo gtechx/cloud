@@ -29,6 +29,33 @@ var roomMapLocal = map[uint64]map[uint64]bool{} //{rid:{uid1:true, uid2:true}} /
 var roomAdminMapLocal = map[uint64]map[uint64]bool{}
 var uidMapAppZone = map[string]map[string]map[uint64]bool{} //{appname:{zonename:{uid1:true, uid2:true}}}
 
+type UserSubData struct {
+	Uid  uint64
+	Data []byte
+}
+
+type RoomSubData struct {
+	Rid  uint64
+	Data []byte
+}
+
+type AppSubData struct {
+	Appname string
+	Data    []byte
+}
+
+type AppZoneSubData struct {
+	Appname  string
+	Zonename string
+	Data     []byte
+}
+
+var userSubMsgList = collections.NewSafeList()
+var roomSubMsgList = collections.NewSafeList()
+var roomAdminSubMsgList = collections.NewSafeList()
+var appSubMsgList = collections.NewSafeList()
+var appZoneSubMsgList = collections.NewSafeList()
+
 type ConnData struct {
 	conn        net.Conn
 	tbl_appdata *gtdb.AppData
@@ -118,15 +145,15 @@ func main() {
 	}
 
 	//register server
-	// err = dbMgr.RegisterChatServer(srvconfig.ServerAddr)
+	err = dbMgr.RegisterChatServer(srvconfig.ServerAddr)
 
-	// if err != nil {
-	// 	panic("register server to gtdata.Manager err:" + err.Error())
-	// }
-	// defer dbMgr.UnRegisterChatServer(srvconfig.ServerAddr)
+	if err != nil {
+		panic("register server to gtdata.Manager err:" + err.Error())
+	}
+	defer dbMgr.UnRegisterChatServer(srvconfig.ServerAddr)
 
 	//keep live init
-	//keepLiveStart()
+	keepLiveStart()
 
 	//check server
 	//checkAllServerAlive()
@@ -163,7 +190,8 @@ func main() {
 	//sendMsgToExchangeServer(0, []byte(srvconfig.ServerAddr))
 
 	//msg from other server monitor
-	messagePullStart()
+	//messagePullStart()
+	dbMgr.CreatePubSub(onUserSubMsg, onRoomSubMsg, onRoomAdminSubMsg, onAppSubMsg, onAppZoneSubMsg)
 
 	fmt.Println(srvconfig.ServerNet + " server start on addr " + srvconfig.ServerAddr + " ok...")
 
@@ -182,11 +210,32 @@ func main() {
 	// fmt.Scanln(&str)
 }
 
+func onUserSubMsg(uid uint64, data []byte) {
+	userSubMsgList.Put(&UserSubData{uid, data})
+}
+
+func onRoomSubMsg(rid uint64, data []byte) {
+	roomSubMsgList.Put(&RoomSubData{rid, data})
+}
+
+func onRoomAdminSubMsg(rid uint64, data []byte) {
+	roomAdminSubMsgList.Put(&RoomSubData{rid, data})
+}
+
+func onAppSubMsg(appname string, data []byte) {
+	appSubMsgList.Put(&AppSubData{appname, data})
+}
+
+func onAppZoneSubMsg(appname, zonename string, data []byte) {
+	appZoneSubMsgList.Put(&AppZoneSubData{appname, zonename, data})
+}
+
 func addAppZoneUid(appname, zonename string, uid uint64) {
 	zonemap, ok := uidMapAppZone[appname]
 	if !ok {
 		zonemap = map[string]map[uint64]bool{}
 		uidMapAppZone[appname] = zonemap
+		dbMgr.SubAppMsg(appname)
 	}
 
 	sessmap, ok := zonemap[zonename]
@@ -194,8 +243,10 @@ func addAppZoneUid(appname, zonename string, uid uint64) {
 	if !ok {
 		sessmap = map[uint64]bool{}
 		zonemap[zonename] = sessmap
+		dbMgr.SubAppZoneMsg(appname, zonename)
 	}
 	sessmap[uid] = true
+
 }
 
 func removeAppZoneUid(appname, zonename string, uid uint64) {
@@ -209,35 +260,118 @@ func removeAppZoneUid(appname, zonename string, uid uint64) {
 			if len(sessmap) == 0 {
 				delete(zonemap, zonename)
 
+				dbMgr.UnSubAppZoneMsg(appname, zonename)
 				if len(zonemap) == 0 {
 					delete(uidMapAppZone, appname)
+					dbMgr.UnSubAppMsg(appname)
 				}
 			}
 		}
 	}
 }
 
-func addOLUser(serveraddr string, uid uint64) {
-	olinfo, ok := userOLMapAll[uid]
+// func addOLUser(serveraddr string, uid uint64) {
+// 	olinfo, ok := userOLMapAll[uid]
+// 	if !ok {
+// 		olinfo = map[string]bool{}
+// 		userOLMapAll[uid] = olinfo
+// 	}
+// 	olinfo[serveraddr] = true //other server
+// }
+
+// func removeOLUser(serveraddr string, uid uint64) {
+// 	olinfo, ok := userOLMapAll[uid]
+// 	if ok {
+// 		_, ok := olinfo[serveraddr]
+// 		if ok {
+// 			delete(olinfo, serveraddr)
+// 			if len(olinfo) == 0 {
+// 				delete(userOLMapAll, uid)
+// 			}
+// 		}
+// 	}
+// }
+
+func addRoomUserToMap(rid, uid uint64) error {
+	var err error
+	userlist, ok := roomMapLocal[rid]
 	if !ok {
-		olinfo = map[string]bool{}
-		userOLMapAll[uid] = olinfo
+		userlist = map[uint64]bool{}
+		roomMapLocal[rid] = userlist
+
+		err = dbMgr.SubRoomMsg(rid)
+		if err != nil {
+			return err
+		}
 	}
-	olinfo[serveraddr] = true //other server
+	userlist[uid] = true
+
+	ok, err = dbMgr.IsRoomAdmin(rid, uid)
+	if err != nil {
+		return err
+	}
+
+	if ok {
+		userlist, ok = roomAdminMapLocal[rid]
+		if !ok {
+			userlist = map[uint64]bool{}
+			roomAdminMapLocal[rid] = userlist
+		}
+		userlist[uid] = true
+
+		err = dbMgr.SubRoomAdminMsg(rid)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func removeOLUser(serveraddr string, uid uint64) {
-	olinfo, ok := userOLMapAll[uid]
+func removeRoomUserFromMap(rid, uid uint64) error {
+	var err error
+	userlist, ok := roomMapLocal[rid]
 	if ok {
-		_, ok := olinfo[serveraddr]
-		if ok {
-			delete(olinfo, serveraddr)
-			if len(olinfo) == 0 {
-				delete(userOLMapAll, uid)
+		delete(userlist, uid)
+
+		if len(userlist) == 0 {
+			delete(roomMapLocal, rid)
+			err = dbMgr.UnSubRoomMsg(rid)
+			if err != nil {
+				return err
 			}
 		}
 	}
+
+	userlist, ok = roomAdminMapLocal[rid]
+	if ok {
+		_, ok = userlist[uid]
+		if ok {
+			delete(userlist, uid)
+
+			if len(userlist) == 0 {
+				delete(roomAdminMapLocal, rid)
+				err = dbMgr.UnSubRoomAdminMsg(rid)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
 }
+
+// func addRoomAdminUser(rid, uid uint64) error {
+// 	err := addRoomUser(rid, uid)
+
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	err = dbMgr.SubRoomAdminMsg(rid)
+// 	return err
+// }
 
 func addOLRoomUser(uid uint64) error {
 	roomlist, err := dbMgr.GetRoomListByJoined(uid)
@@ -246,11 +380,14 @@ func addOLRoomUser(uid uint64) error {
 		return err
 	}
 
+	rids := []uint64{}
+	adminrids := []uint64{}
 	for _, room := range roomlist {
 		userlist, ok := roomMapLocal[room.Rid]
 		if !ok {
 			userlist = map[uint64]bool{}
 			roomMapLocal[room.Rid] = userlist
+			rids = append(rids, room.Rid)
 		}
 		userlist[uid] = true
 
@@ -264,9 +401,20 @@ func addOLRoomUser(uid uint64) error {
 			if !ok {
 				userlist = map[uint64]bool{}
 				roomAdminMapLocal[room.Rid] = userlist
+				adminrids = append(adminrids, room.Rid)
 			}
 			userlist[uid] = true
 		}
+	}
+
+	err = dbMgr.SubRoomMsg(rids...)
+	if err != nil {
+		return err
+	}
+
+	err = dbMgr.SubRoomAdminMsg(rids...)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -279,6 +427,8 @@ func removeOLRoomUser(uid uint64) error {
 		return err
 	}
 
+	rids := []uint64{}
+	adminrids := []uint64{}
 	for _, room := range roomlist {
 		userlist, ok := roomMapLocal[room.Rid]
 		if ok {
@@ -286,6 +436,7 @@ func removeOLRoomUser(uid uint64) error {
 
 			if len(userlist) == 0 {
 				delete(roomMapLocal, room.Rid)
+				rids = append(rids, room.Rid)
 			}
 		}
 
@@ -297,9 +448,20 @@ func removeOLRoomUser(uid uint64) error {
 
 				if len(userlist) == 0 {
 					delete(roomAdminMapLocal, room.Rid)
+					adminrids = append(adminrids, room.Rid)
 				}
 			}
 		}
+	}
+
+	err = dbMgr.UnSubRoomMsg(rids...)
+	if err != nil {
+		return err
+	}
+
+	err = dbMgr.UnSubRoomAdminMsg(rids...)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -325,7 +487,8 @@ func loop() {
 			}
 
 			conndata := item.(*ConnData)
-			_, ok := sessMap[conndata.tbl_appdata.ID]
+			uid := conndata.tbl_appdata.ID
+			_, ok := sessMap[uid]
 			sess := CreateSess(conndata.conn, conndata.tbl_appdata, conndata.platform)
 			sess.Start()
 
@@ -335,22 +498,30 @@ func loop() {
 			if !ok {
 				//if didn't had this id logined on this server
 				//get room user joined and add room info to roomMapLocal
-				if err = addOLRoomUser(conndata.tbl_appdata.ID); err != nil {
+				if err = addOLRoomUser(uid); err != nil {
 					fmt.Println(err.Error())
 					sess.Stop()
 					continue
 				}
 
-				addAppZoneUid(conndata.tbl_appdata.Appname, conndata.tbl_appdata.Zonename, conndata.tbl_appdata.ID)
+				addAppZoneUid(conndata.tbl_appdata.Appname, conndata.tbl_appdata.Zonename, uid)
+
+				err = dbMgr.SubUserMsg(uid)
+				if err != nil {
+					fmt.Println(err.Error())
+					sess.Stop()
+					continue
+				}
 			}
 
 			limitcount++
-			//dbMgr.IncrByChatServerClientCount(srvconfig.ServerAddr, 1)
 
 			if limitcount >= 100 {
 				break
 			}
 		}
+
+		dbMgr.IncrByChatServerClientCount(srvconfig.ServerAddr, limitcount)
 
 		//send msg to exchange server
 		// lenuid := len(uidarr)
@@ -369,111 +540,11 @@ func loop() {
 			}
 
 			event := item.(*ServerEvent)
-			data := event.Data
+			//data := event.Data
 			fmt.Println("processing server event msgid " + String(event.Msgid))
 			switch event.Msgid {
 			case gtmsg.SMsgId_ServerQuit:
 				isQuit = true
-			case gtmsg.SMsgId_UserOnline:
-				// uid := Uint64(data)
-				// serveraddr := String(data[8:])
-				// // strarr := strings.Split(platformandserver, "#")
-				// // //platform := strarr[0]
-				// // serveraddr := strarr[1]
-				// addOLUser(serveraddr, uid)
-
-				//kickout same platform for same uid
-				msg := &gtmsg.SMsgUserOnline{}
-				err = json.Unmarshal(data, msg)
-				if err == nil {
-					for i, uid := range msg.Uids {
-						platform := msg.Platforms[i]
-
-						sesslist, ok := sessMap[uid]
-						if ok {
-							sess, ok := sesslist[platform]
-							if ok {
-								sess.KickOut()
-								delete(sesslist, platform)
-							}
-						}
-					}
-				}
-			//case gtmsg.SMsgId_UserOffline:
-			// uid := Uint64(data)
-			// serveraddr := String(data[8:])
-			// removeOLUser(serveraddr, uid)
-			case gtmsg.SMsgId_RoomPresence:
-				msg := &gtmsg.SMsgRoomPresence{}
-				err = json.Unmarshal(data, msg)
-				if err == nil {
-					switch msg.PresenceType {
-					case PresenceType_Subscribed:
-						roomusers, ok := roomMapLocal[msg.Rid]
-						if ok {
-							roomusers[msg.Uid] = true
-						}
-					case PresenceType_UnSubscribe:
-						roomusers, ok := roomMapLocal[msg.Rid]
-						if ok {
-							_, ok := roomusers[msg.Uid]
-							if ok {
-								delete(roomusers, msg.Uid)
-							}
-						}
-					case PresenceType_Jinyan:
-					case PresenceType_Ban:
-					case PresenceType_Dismiss:
-						_, ok := roomMapLocal[msg.Rid]
-						if ok {
-							delete(roomMapLocal, msg.Rid)
-						}
-					}
-					SendMsgToLocalRoom(msg.Rid, msg.Data)
-				}
-			case gtmsg.SMsgId_UserPresence:
-				msg := &gtmsg.SMsgUserPresence{}
-				err = json.Unmarshal(data, msg)
-				if err == nil {
-					SendMsgToLocalUid(msg.To, msg.Data)
-				}
-			case gtmsg.SMsgId_UserMessage:
-				msg := &gtmsg.SMsgUserMessage{}
-				err = json.Unmarshal(data, msg)
-				if err == nil {
-					SendMsgToLocalUid(msg.From, msg.Data)
-					SendMsgToLocalUid(msg.To, msg.Data)
-				}
-			case gtmsg.SMsgId_RoomMessage:
-				msg := &gtmsg.SMsgRoomMessage{}
-				err = json.Unmarshal(data, msg)
-				if err == nil {
-					SendMsgToLocalRoom(msg.To, msg.Data)
-				}
-			case gtmsg.SMsgId_ZonePublicMessage:
-				msg := &gtmsg.SMsgZonePublicMessage{}
-				err = json.Unmarshal(data, msg)
-				if err == nil {
-					SendZonePublicMsg(msg.Appname, msg.Zonename, msg.Data)
-				}
-			case gtmsg.SMsgId_AppPublicMessage:
-				msg := &gtmsg.SMsgZonePublicMessage{}
-				err = json.Unmarshal(data, msg)
-				if err == nil {
-					SendAppPublicMsg(msg.Appname, msg.Data)
-				}
-			case gtmsg.SMsgId_ServerPublicMessage:
-				msg := &gtmsg.SMsgServerPublicMessage{}
-				err = json.Unmarshal(data, msg)
-				if err == nil {
-					SendServerPublicMsg(msg.Data)
-				}
-			case gtmsg.SMsgId_RoomAdminMessage:
-				msg := &gtmsg.SMsgRoomAdminMessage{}
-				err = json.Unmarshal(data, msg)
-				if err == nil {
-					SendMsgToLocalRoomAdmin(msg.To, msg.Data)
-				}
 			}
 
 			limitcount++
@@ -481,6 +552,56 @@ func loop() {
 			if limitcount >= 100 {
 				break
 			}
+		}
+
+		for {
+			item, err := userSubMsgList.Pop()
+			if err != nil {
+				break
+			}
+
+			data := item.(*UserSubData)
+			SendMsgToLocalUid(data.Uid, data.Data)
+		}
+
+		for {
+			item, err := roomSubMsgList.Pop()
+			if err != nil {
+				break
+			}
+
+			data := item.(*RoomSubData)
+			SendMsgToLocalRoom(data.Rid, data.Data)
+		}
+
+		for {
+			item, err := roomAdminSubMsgList.Pop()
+			if err != nil {
+				break
+			}
+
+			data := item.(*RoomSubData)
+			SendMsgToLocalRoomAdmin(data.Rid, data.Data)
+		}
+
+		for {
+			item, err := appSubMsgList.Pop()
+			if err != nil {
+				break
+			}
+
+			data := item.(*AppSubData)
+			SendAppPublicMsg(data.Appname, data.Data)
+		}
+
+		for {
+			item, err := appZoneSubMsgList.Pop()
+			if err != nil {
+				break
+			}
+
+			data := item.(*AppZoneSubData)
+			SendZonePublicMsg(data.Appname, data.Zonename, data.Data)
 		}
 
 		//traversal all sess, can parallel the update to diff goroutine
@@ -493,6 +614,7 @@ func loop() {
 
 		//remove sess stoped
 		//uidarr = []uint64{}
+		limitcount = 0
 		for {
 			item, err := toDeleteSessList.Pop()
 			if err != nil {
@@ -523,12 +645,23 @@ func loop() {
 					//dbMgr.RemoveOnlineUser(srvconfig.ServerAddr, sess.ID())
 
 					removeAppZoneUid(sess.AppName(), sess.ZoneName(), sess.ID())
+
+					err = dbMgr.UnSubUserMsg(sess.ID())
+					if err != nil {
+						fmt.Println(err.Error())
+						continue
+					}
 				}
 			}
 
-			//dbMgr.IncrByChatServerClientCount(srvconfig.ServerAddr, -1)
+			limitcount++
+
+			if limitcount >= 100 {
+				break
+			}
 		}
 
+		dbMgr.IncrByChatServerClientCount(srvconfig.ServerAddr, -limitcount)
 		//send event to exchange server
 		// lenuid = len(uidarr)
 		// if lenuid > 0 {

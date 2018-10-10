@@ -351,13 +351,13 @@ func (db *DBManager) GetAccountZoneList(account, appname string) ([]*AccountZone
 }
 
 func (db *DBManager) SetUserLastMsgTime(uid uint64, timestamp int64) error {
-	retdb := db.sql.Model(appdata_table).Where("uid = ?", uid).Update("lastmsgtime", timestamp)
+	retdb := db.sql.Model(appdata_table).Where("id = ?", uid).Update("lastmsgtime", timestamp)
 	return retdb.Error
 }
 
 func (db *DBManager) GetUserLastMsgTime(uid uint64) (int64, error) {
 	tbl_appdata := &AppData{}
-	retdb := db.sql.Model(appdata_table).Where("uid = ?", uid).Select("lastmsgtime").Scan(tbl_appdata)
+	retdb := db.sql.Model(appdata_table).Where("id = ?", uid).Select("lastmsgtime").Scan(tbl_appdata)
 	return tbl_appdata.Lastmsgtime, retdb.Error
 }
 

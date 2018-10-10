@@ -1,9 +1,9 @@
 cd bin
 
-echo starting exchangeserver
-start exchangeserver.exe
+REM echo starting exchangeserver
+REM start exchangeserver.exe
 
-ping -n 2 127.1 >nul
+REM ping -n 2 127.1 >nul
 
 echo starting chatserver
 start chatserver.exe -config="../res/config/chatserver.config"

@@ -25,11 +25,11 @@ var minUserServer string
 var minUserCount int = 999999
 
 func messagePullStart() {
-	exchangeServerClient = gtnet.NewClient("tcp", "127.0.0.1:30000", Parser)
-	err := exchangeServerClient.Connect()
-	if err != nil {
-		panic("exchangeServerClient connect error:" + err.Error())
-	}
+	// exchangeServerClient = gtnet.NewClient("tcp", "127.0.0.1:30000", Parser)
+	// err := exchangeServerClient.Connect()
+	// if err != nil {
+	// 	panic("exchangeServerClient connect error:" + err.Error())
+	// }
 
 	go startMessageSend()
 	//go startEventPull()
@@ -47,16 +47,17 @@ func sendMsgToExchangeServer(msgid uint16, msg interface{}) {
 }
 
 func startMessageSend() {
-	senddata := gtmsg.PackageMsg(gtmsg.ReqFrame, 0, gtmsg.SMsgId_ReqChatServerList, nil)
-	exchangeServerClient.Send(senddata)
+	// senddata := gtmsg.PackageMsg(gtmsg.ReqFrame, 0, gtmsg.SMsgId_ReqChatServerList, nil)
+	// exchangeServerClient.Send(senddata)
 
 	for {
-		timer := time.NewTimer(time.Second * 5)
+		timer := time.NewTimer(time.Second * 2)
 
 		select {
 		case <-timer.C:
-			senddata := gtmsg.PackageMsg(gtmsg.ReqFrame, 0, gtmsg.SMsgId_ReqChatServerList, nil)
-			exchangeServerClient.Send(senddata)
+			// senddata := gtmsg.PackageMsg(gtmsg.ReqFrame, 0, gtmsg.SMsgId_ReqChatServerList, nil)
+			// exchangeServerClient.Send(senddata)
+			minUserServer, _ = dbMgr.GetChatServer()
 		}
 	}
 }

@@ -60,26 +60,29 @@ func (db *DBManager) GetChatServerList() ([]string, error) {
 	return ret.Val(), ret.Err()
 }
 
-// func (db *DBManager) GetChatServer() (string, error) {
-// 	// conn := db.rd.Get()
-// 	// defer conn.Close()
+func (db *DBManager) GetChatServer() (string, error) {
+	// conn := db.rd.Get()
+	// defer conn.Close()
 
-// 	// ret, err := conn.Do("ZRANGE", chatServerKeyName, 0, -1)
+	// ret, err := conn.Do("ZRANGE", chatServerKeyName, 0, -1)
 
-// 	// if err != nil {
-// 	// 	return "", err
-// 	// }
+	// if err != nil {
+	// 	return "", err
+	// }
 
-// 	// slist, err := redis.Strings(ret, err)
+	// slist, err := redis.Strings(ret, err)
 
-// 	// if err != nil || len(slist) == 0 {
-// 	// 	return "", err
-// 	// }
+	// if err != nil || len(slist) == 0 {
+	// 	return "", err
+	// }
 
-// 	// return slist[0], nil
-// 	ret := db.rd.ZRange(chatServerKeyName, 0, 1)
-// 	return ret.Val()[0], ret.Err()
-// }
+	// return slist[0], nil
+	ret := db.rd.ZRange(chatServerKeyName, 0, 1)
+	if ret.Err() != nil || len(ret.Val()) < 1 {
+		return "", ret.Err()
+	}
+	return ret.Val()[0], nil
+}
 
 func (db *DBManager) GetChatServerCount() (int64, error) {
 	// conn := db.rd.Get()
@@ -91,7 +94,7 @@ func (db *DBManager) GetChatServerCount() (int64, error) {
 
 	// return Int(count), err
 	ret := db.rd.ZCard(chatServerKeyName)
-	return ret.Val(), ret.Err()
+	return ret.Result()
 }
 
 func (db *DBManager) InitChatServerTTL(serveraddr string, seconds int) error {
@@ -100,7 +103,7 @@ func (db *DBManager) InitChatServerTTL(serveraddr string, seconds int) error {
 	// _, err := conn.Do("SET", "ttl:"+serveraddr, "", "EX", seconds)
 	// return err
 
-	ret := db.rd.Set("ttl:"+serveraddr, "", time.Duration(seconds))
+	ret := db.rd.Set("ttl:"+serveraddr, "", time.Duration(seconds)*time.Second)
 	return ret.Err()
 }
 
@@ -112,11 +115,11 @@ func (db *DBManager) UpdateChatServerTTL(serveraddr string, seconds int) error {
 	// //conn.Send("EXPIRE", "onlineuser:"+serveraddr, seconds)
 	// _, err := conn.Do("EXEC")
 	// return err
-	pipe := db.rd.TxPipeline()
-	pipe.Set("ttl:"+serveraddr, "", time.Duration(seconds))
-	pipe.Expire("onlineuser:"+serveraddr, time.Duration(seconds))
-	_, err := pipe.Exec()
-	return err
+	//pipe := db.rd.TxPipeline()
+	ret := db.rd.Set("ttl:"+serveraddr, "", time.Duration(seconds)*time.Second)
+	//pipe.Expire("onlineuser:"+serveraddr, time.Duration(seconds)* time.Second)
+	//_, err := pipe.Exec()
+	return ret.Err()
 }
 
 func (db *DBManager) IsChatServerAlive(serveraddr string) (bool, error) {
@@ -137,7 +140,7 @@ func (db *DBManager) SaveChatLoginToken(token string, databytes []byte, timeout 
 	// defer conn.Close()
 	// _, err := conn.Do("SET", "chattoken:"+token, databytes, "EX", timeout)
 	// return err
-	ret := db.rd.Set("chattoken:"+token, databytes, time.Duration(timeout))
+	ret := db.rd.Set("chattoken:"+token, databytes, time.Duration(timeout)*time.Second)
 	return ret.Err()
 }
 

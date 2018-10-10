@@ -19,6 +19,8 @@ func createRoom(appdataid uint64, roommsg *MsgReqCreateRoom, perrcode *uint16) b
 		return false
 	}
 
+	addRoomUserToMap(tbl_room.Rid, appdataid)
+
 	return true
 }
 

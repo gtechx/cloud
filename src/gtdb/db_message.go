@@ -1,6 +1,7 @@
 package gtdb
 
 import (
+	"strings"
 	"time"
 
 	"github.com/go-redis/redis"
@@ -47,7 +48,7 @@ func (db *DBManager) AddPresence(from, to uint64) error {
 	// defer conn.Close()
 	// _, err := conn.Do("SET", "user:presence:"+String(to)+":"+String(from), "EX", 60*60*24*7) //记录到目的地用户presence列表
 	// return err
-	ret := db.rd.Set("user:presence:"+String(to)+":"+String(from), "EX", 60*60*24*7)
+	ret := db.rd.Set("user:presence:"+String(to)+":"+String(from), "", time.Duration(60*60*24*7)*time.Second)
 	return ret.Err()
 }
 
@@ -73,7 +74,7 @@ func (db *DBManager) AddRoomPresence(rid, appdataid uint64) error {
 	// _, err := conn.Do("SADD", "room:presence:"+String(rid), appdataid)
 	// //_, err := conn.Do("SET", "roompresence:"+String(rid)+":"+String(appdataid), "", "ex 259200") //记录到目的地用户presence列表
 	// return err
-	ret := db.rd.Del("room:presence:"+String(rid), String(appdataid))
+	ret := db.rd.SAdd("room:presence:"+String(rid), String(appdataid))
 	return ret.Err()
 }
 
@@ -238,7 +239,7 @@ func (db *DBManager) SaveLoginToken(account, token string, timeout int) error {
 	// defer conn.Close()
 	// _, err := conn.Do("SET", "token:"+account, token, "EX", timeout)
 	// return err
-	ret := db.rd.Set("token:"+account, token, time.Duration(timeout))
+	ret := db.rd.Set("token:"+account, token, time.Duration(timeout)*time.Second)
 	return ret.Err()
 }
 
@@ -251,14 +252,57 @@ func (db *DBManager) GetLoginToken(account string) (string, error) {
 	return ret.Result()
 }
 
+var pubsub *redis.PubSub
+
+func (db *DBManager) CreatePubSub(usermsgcb func(uint64, []byte), roommsgcb func(uint64, []byte), roomadminmsgcb func(uint64, []byte), appmsgcb func(string, []byte), appzonemsgcb func(string, string, []byte)) <-chan *redis.Message {
+	pubsub = db.rd.Subscribe()
+	msgchan := pubsub.Channel()
+	go msgLoop(msgchan, usermsgcb, roommsgcb, roomadminmsgcb, appmsgcb, appzonemsgcb)
+	return msgchan
+}
+
+func (db *DBManager) StopPubSub() error {
+	return pubsub.Close()
+}
+
+func msgLoop(msgchan <-chan *redis.Message, usermsgcb func(uint64, []byte), roommsgcb func(uint64, []byte), roomadminmsgcb func(uint64, []byte), appmsgcb func(string, []byte), appzonemsgcb func(string, string, []byte)) {
+	for msg := range msgchan {
+		keyarr := strings.Split(msg.Channel, ":")
+		count := len(keyarr)
+		switch keyarr[0] {
+		case "user":
+			usermsgcb(Uint64(keyarr[count-1]), []byte(msg.Payload))
+		case "room":
+			roommsgcb(Uint64(keyarr[count-1]), []byte(msg.Payload))
+		case "roomadmin":
+			roomadminmsgcb(Uint64(keyarr[count-1]), []byte(msg.Payload))
+		case "app":
+			appmsgcb(String(keyarr[count-1]), []byte(msg.Payload))
+		case "appzone":
+			appzonemsgcb(String(keyarr[count-2]), String(keyarr[count-1]), []byte(msg.Payload))
+		}
+	}
+}
+
 func (db *DBManager) PubUserMsg(uid uint64, data []byte) error {
 	ret := db.rd.Publish("user:msg:"+String(uid), data)
 	return ret.Err()
 }
 
-func (db *DBManager) SubUserMsg(uid uint64) <-chan *redis.Message {
-	ret := db.rd.Subscribe("user:msg:" + String(uid))
-	return ret.Channel()
+func (db *DBManager) SubUserMsg(uids ...uint64) error {
+	struids := []string{}
+	for _, uid := range uids {
+		struids = append(struids, "user:msg:"+String(uid))
+	}
+	return pubsub.Subscribe(struids...)
+}
+
+func (db *DBManager) UnSubUserMsg(uids ...uint64) error {
+	struids := []string{}
+	for _, uid := range uids {
+		struids = append(struids, "user:msg:"+String(uid))
+	}
+	return pubsub.Unsubscribe(struids...)
 }
 
 func (db *DBManager) GetUserSubNum(uid uint64) (int64, error) {
@@ -278,9 +322,20 @@ func (db *DBManager) PubRoomMsg(rid uint64, data []byte) error {
 	return ret.Err()
 }
 
-func (db *DBManager) SubRoomMsg(rid uint64) <-chan *redis.Message {
-	ret := db.rd.Subscribe("room:msg:" + String(rid))
-	return ret.Channel()
+func (db *DBManager) SubRoomMsg(rids ...uint64) error {
+	strrids := []string{}
+	for _, rid := range rids {
+		strrids = append(strrids, "room:msg:"+String(rid))
+	}
+	return pubsub.Subscribe(strrids...)
+}
+
+func (db *DBManager) UnSubRoomMsg(rids ...uint64) error {
+	strrids := []string{}
+	for _, rid := range rids {
+		strrids = append(strrids, "room:msg:"+String(rid))
+	}
+	return pubsub.Unsubscribe(strrids...)
 }
 
 func (db *DBManager) GetRoomSubNum(rid uint64) (int64, error) {
@@ -296,17 +351,28 @@ func (db *DBManager) GetRoomSubNum(rid uint64) (int64, error) {
 }
 
 func (db *DBManager) PubRoomAdminMsg(rid uint64, data []byte) error {
-	ret := db.rd.Publish("room:admin:msg:"+String(rid), data)
+	ret := db.rd.Publish("roomadmin:msg:"+String(rid), data)
 	return ret.Err()
 }
 
-func (db *DBManager) SubRoomAdminMsg(rid uint64) <-chan *redis.Message {
-	ret := db.rd.Subscribe("room:admin:msg:" + String(rid))
-	return ret.Channel()
+func (db *DBManager) SubRoomAdminMsg(rids ...uint64) error {
+	strrids := []string{}
+	for _, rid := range rids {
+		strrids = append(strrids, "roomadmin:msg:"+String(rid))
+	}
+	return pubsub.Subscribe(strrids...)
+}
+
+func (db *DBManager) UnSubRoomAdminMsg(rids ...uint64) error {
+	strrids := []string{}
+	for _, rid := range rids {
+		strrids = append(strrids, "roomadmin:msg:"+String(rid))
+	}
+	return pubsub.Unsubscribe(strrids...)
 }
 
 func (db *DBManager) GetRoomAdminSubNum(rid uint64) (int64, error) {
-	key := "room:admin:msg:" + String(rid)
+	key := "roomadmin:msg:" + String(rid)
 	ret := db.rd.PubSubNumSub(key)
 	err := ret.Err()
 
@@ -322,9 +388,20 @@ func (db *DBManager) PubAppMsg(appname string, data []byte) error {
 	return ret.Err()
 }
 
-func (db *DBManager) SubAppMsg(appname string) <-chan *redis.Message {
-	ret := db.rd.Subscribe("app:msg:" + appname)
-	return ret.Channel()
+func (db *DBManager) SubAppMsg(appnames ...string) error {
+	strappnames := []string{}
+	for _, appname := range appnames {
+		strappnames = append(strappnames, "app:msg:"+appname)
+	}
+	return pubsub.Subscribe(strappnames...)
+}
+
+func (db *DBManager) UnSubAppMsg(appnames ...string) error {
+	strappnames := []string{}
+	for _, appname := range appnames {
+		strappnames = append(strappnames, "app:msg:"+appname)
+	}
+	return pubsub.Unsubscribe(strappnames...)
 }
 
 func (db *DBManager) GetAppSubNum(appname string) (int64, error) {
@@ -340,17 +417,20 @@ func (db *DBManager) GetAppSubNum(appname string) (int64, error) {
 }
 
 func (db *DBManager) PubAppZoneMsg(appname, zonename string, data []byte) error {
-	ret := db.rd.Publish("app:zone:msg:"+appname+":"+zonename, data)
+	ret := db.rd.Publish("appzone:msg:"+appname+":"+zonename, data)
 	return ret.Err()
 }
 
-func (db *DBManager) SubAppZoneMsg(appname, zonename string) <-chan *redis.Message {
-	ret := db.rd.Subscribe("app:zone:msg:" + appname + ":" + zonename)
-	return ret.Channel()
+func (db *DBManager) SubAppZoneMsg(appname, zonename string) error {
+	return pubsub.Subscribe("appzone:msg:" + appname + ":" + zonename)
+}
+
+func (db *DBManager) UnSubAppZoneMsg(appname, zonename string) error {
+	return pubsub.Unsubscribe("appzone:msg:" + appname + ":" + zonename)
 }
 
 func (db *DBManager) GetAppZoneSubNum(appname, zonename string) (int64, error) {
-	key := "app:zone:msg:" + appname + ":" + zonename
+	key := "appzone:msg:" + appname + ":" + zonename
 	ret := db.rd.PubSubNumSub(key)
 	err := ret.Err()
 
