@@ -34,7 +34,17 @@ type UserSubData struct {
 	Data []byte
 }
 
+type UserSubEvent struct {
+	Uid  uint64
+	Data []byte
+}
+
 type RoomSubData struct {
+	Rid  uint64
+	Data []byte
+}
+
+type RoomSubEvent struct {
 	Rid  uint64
 	Data []byte
 }
@@ -51,7 +61,9 @@ type AppZoneSubData struct {
 }
 
 var userSubMsgList = collections.NewSafeList()
+var userSubEventList = collections.NewSafeList()
 var roomSubMsgList = collections.NewSafeList()
+var roomSubEventList = collections.NewSafeList()
 var roomAdminSubMsgList = collections.NewSafeList()
 var appSubMsgList = collections.NewSafeList()
 var appZoneSubMsgList = collections.NewSafeList()
@@ -191,7 +203,7 @@ func main() {
 
 	//msg from other server monitor
 	//messagePullStart()
-	dbMgr.CreatePubSub(onUserSubMsg, onRoomSubMsg, onRoomAdminSubMsg, onAppSubMsg, onAppZoneSubMsg)
+	dbMgr.StartPubSub(onUserSubMsg, onUserSubEvent, onRoomSubMsg, onRoomSubEvent, onRoomAdminSubMsg, onAppSubMsg, onAppZoneSubMsg)
 
 	fmt.Println(srvconfig.ServerNet + " server start on addr " + srvconfig.ServerAddr + " ok...")
 
@@ -214,8 +226,16 @@ func onUserSubMsg(uid uint64, data []byte) {
 	userSubMsgList.Put(&UserSubData{uid, data})
 }
 
+func onUserSubEvent(uid uint64, data []byte) {
+	userSubEventList.Put(&UserSubEvent{uid, data})
+}
+
 func onRoomSubMsg(rid uint64, data []byte) {
 	roomSubMsgList.Put(&RoomSubData{rid, data})
+}
+
+func onRoomSubEvent(rid uint64, data []byte) {
+	roomSubEventList.Put(&RoomSubEvent{rid, data})
 }
 
 func onRoomAdminSubMsg(rid uint64, data []byte) {
@@ -432,11 +452,14 @@ func removeOLRoomUser(uid uint64) error {
 	for _, room := range roomlist {
 		userlist, ok := roomMapLocal[room.Rid]
 		if ok {
-			delete(userlist, uid)
+			_, ok = userlist[uid]
+			if ok {
+				delete(userlist, uid)
 
-			if len(userlist) == 0 {
-				delete(roomMapLocal, room.Rid)
-				rids = append(rids, room.Rid)
+				if len(userlist) == 0 {
+					delete(roomMapLocal, room.Rid)
+					rids = append(rids, room.Rid)
+				}
 			}
 		}
 
@@ -465,6 +488,18 @@ func removeOLRoomUser(uid uint64) error {
 	}
 
 	return nil
+}
+
+func dismissRoom(rid uint64) {
+	_, ok := roomMapLocal[rid]
+	if ok {
+		delete(roomMapLocal, rid)
+	}
+
+	_, ok = roomAdminMapLocal[rid]
+	if ok {
+		delete(roomAdminMapLocal, rid)
+	}
 }
 
 func loop() {
@@ -565,6 +600,26 @@ func loop() {
 		}
 
 		for {
+			item, err := userSubEventList.Pop()
+			if err != nil {
+				break
+			}
+
+			data := item.(*UserSubEvent)
+			eventid := Uint16(data.Data)
+			switch eventid {
+			case gtmsg.EventId_UserJoinRoom:
+				rid := Uint64(data.Data[2:])
+				addRoomUserToMap(rid, data.Uid)
+			case gtmsg.EventId_UserLeaveRoom:
+				rid := Uint64(data.Data[2:])
+				removeRoomUserFromMap(rid, data.Uid)
+			case gtmsg.EventId_UserRoomAdmin:
+			case gtmsg.EventId_UserRoomUnAdmin:
+			}
+		}
+
+		for {
 			item, err := roomSubMsgList.Pop()
 			if err != nil {
 				break
@@ -572,6 +627,21 @@ func loop() {
 
 			data := item.(*RoomSubData)
 			SendMsgToLocalRoom(data.Rid, data.Data)
+		}
+
+		for {
+			item, err := roomSubEventList.Pop()
+			if err != nil {
+				break
+			}
+
+			data := item.(*RoomSubEvent)
+			eventid := Uint16(data.Data)
+			switch eventid {
+			case gtmsg.EventId_RoomDismiss:
+				rid := Uint64(data.Data[2:])
+				dismissRoom(rid)
+			}
 		}
 
 		for {

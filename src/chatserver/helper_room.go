@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"gtmsg"
 	"time"
 
 	"gtdb"
-	//. "github.com/gtechx/base/common"
+
+	. "github.com/gtechx/base/common"
 )
 
 //所有这类函数，返回false表示出错
@@ -19,7 +21,8 @@ func createRoom(appdataid uint64, roommsg *MsgReqCreateRoom, perrcode *uint16) b
 		return false
 	}
 
-	addRoomUserToMap(tbl_room.Rid, appdataid)
+	event := &gtmsg.EventUserJoinRoom{gtmsg.EventId_UserJoinRoom, tbl_room.Rid}
+	dbMgr.PubUserEvent(appdataid, Bytes(event))
 
 	return true
 }
@@ -118,6 +121,8 @@ func addRoomUser(rid, appdataid uint64, presence *MsgRoomPresence, perrcode *uin
 			*perrcode = ERR_INVALID_JSON
 		} else {
 			SendPresenceToRoom(rid, appdataid, PresenceType_Subscribed, presencebytes)
+			event := &gtmsg.EventUserJoinRoom{gtmsg.EventId_UserJoinRoom, rid}
+			dbMgr.PubUserEvent(appdataid, Bytes(event))
 			return true
 		}
 
@@ -332,6 +337,8 @@ func banRoomUser(rid, appdataid uint64, perrcode *uint16) bool {
 		*perrcode = ERR_INVALID_JSON
 	} else {
 		SendPresenceToRoom(rid, appdataid, PresenceType_UnSubscribe, presencebytes)
+		event := &gtmsg.EventUserLeaveRoom{gtmsg.EventId_UserLeaveRoom, rid}
+		dbMgr.PubUserEvent(appdataid, Bytes(event))
 		return true
 	}
 
@@ -350,6 +357,8 @@ func removeRoomUser(rid, appdataid uint64, presence *MsgRoomPresence, perrcode *
 		*perrcode = ERR_INVALID_JSON
 	} else {
 		SendPresenceToRoom(rid, appdataid, PresenceType_UnSubscribe, presencebytes)
+		event := &gtmsg.EventUserLeaveRoom{gtmsg.EventId_UserLeaveRoom, rid}
+		dbMgr.PubUserEvent(appdataid, Bytes(event))
 		return true
 	}
 

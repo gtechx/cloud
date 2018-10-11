@@ -234,3 +234,28 @@ type SMsgServerPublicMessage struct {
 }
 
 //server internal msg end
+
+//user event
+const EventId_UserJoinRoom uint16 = 30000
+
+type EventUserJoinRoom struct {
+	Eventid uint16 `json:"eventid"`
+	Rid     uint64 `json:"rid"`
+}
+
+const EventId_UserLeaveRoom uint16 = 30005
+
+type EventUserLeaveRoom struct {
+	Eventid uint16 `json:"eventid"`
+	Rid     uint64 `json:"rid"`
+}
+
+const EventId_UserRoomAdmin uint16 = 30010
+const EventId_UserRoomUnAdmin uint16 = 30015
+
+//user event end
+
+//room event
+const EventId_RoomDismiss uint16 = 31000
+
+//room event end
