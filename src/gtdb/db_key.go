@@ -317,13 +317,13 @@ type AppData struct {
 	Nickname    string    `redis:"nickname" json:"nickname"`
 	Desc        string    `redis:"desc" json:"desc"`
 	Sex         string    `redis:"sex" json:"sex"`
-	Birthday    time.Time `redis:"birthday" json:"birthday"`
+	Birthday    time.Time `redis:"birthday" json:"birthday" gorm:"default:NULL"`
 	Country     string    `redis:"country" json:"country"`
 	Isbaned     bool      `redis:"isbaned" json:"isbaned" gorm:"tinyint(1);default:0"`
 	Isjinyan    bool      `redis:"isjinyan" json:"isjinyan" gorm:"tinyint(1);default:0"`
 	Regip       string    `redis:"regip" json:"regip"`
 	Lastip      string    `redis:"lastip" json:"lastip"`
-	Lastlogin   time.Time `redis:"lastlogin" json:"lastlogin"`
+	Lastlogin   time.Time `redis:"lastlogin" json:"lastlogin" gorm:"default:NULL"`
 	CreatedAt   time.Time `redis:"createdate" json:"createdate"`
 	Lastmsgtime int64     `redis:"lastmsgtime" json:"lastmsgtime,string"`
 	//Lastpresencetime int64     `redis:"lastpresencetime" json:"lastpresencetime,string"`

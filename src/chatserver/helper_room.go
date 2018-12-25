@@ -2,10 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"gtdb"
 	"gtmsg"
 	"time"
-
-	"gtdb"
 
 	. "github.com/gtechx/base/common"
 )
@@ -33,6 +32,8 @@ func deleteRoom(who, rid uint64, perrcode *uint16) bool {
 		*perrcode = ERR_DB
 		return false
 	}
+
+	dbMgr.ClearRoomData(rid)
 
 	presence := &MsgRoomPresence{PresenceType: PresenceType_Dismiss, Rid: rid, Who: who, TimeStamp: time.Now().Unix()}
 	presencebytes, err := json.Marshal(presence)

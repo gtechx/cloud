@@ -67,6 +67,15 @@ func (db *DBManager) RemovePresence(id, from uint64) error {
 // 	return redis.StringMap(ret, err) //.ByteSlices(ret, err)
 // }
 
+func (db *DBManager) ClearRoomData(rid uint64) error {
+	// conn := db.rd.Get()
+	// defer conn.Close()
+	// ret, err := conn.Do("EXISTS", "user:presence:"+String(id)+":"+String(from))
+	// return redis.Bool(ret, err)
+	ret := db.rd.Del("room:presence:"+String(rid), "room:message:history:"+String(rid))
+	return ret.Err()
+}
+
 func (db *DBManager) AddRoomPresence(rid, appdataid uint64) error {
 	// conn := db.rd.Get()
 	// defer conn.Close()

@@ -2,9 +2,8 @@ package main
 
 import (
 	"fmt"
-	"net"
-
 	"gtdb"
+	"net"
 
 	"github.com/gtechx/base/collections"
 	. "github.com/gtechx/base/common"
@@ -79,7 +78,7 @@ func (s *Sess) Start() {
 	s.msgList = collections.NewSafeList()
 	s.sendList = collections.NewSafeList()
 	go s.startRecv()
-	go s.startSend()
+	//go s.startSend()
 }
 
 func (s *Sess) Stop() {

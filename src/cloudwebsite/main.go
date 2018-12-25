@@ -1,16 +1,15 @@
 package main
 
 import (
+	_ "cloudwebsite/routers"
+	"gtdb"
 	"html/template"
 	"math/rand"
 	"time"
 
-	_ "cloudwebsite/routers"
-
 	"github.com/astaxie/beego"
 	_ "github.com/astaxie/beego/session/redis"
 	. "github.com/gtechx/base/common"
-	"gtdb"
 )
 
 func Add(a, b int) int {
@@ -27,12 +26,12 @@ func RandString() string {
 }
 
 var DBConfig = `{
-	"redisaddr":"127.0.0.1:6379",
+	"redisaddr":"192.168.93.12:6379",
     "redispwd":"",
     "redisdefaultdb":2,
     "redismaxconn": 10,
 
-    "mysqladdr":"127.0.0.1:3306",
+    "mysqladdr":"192.168.93.12:3306",
     "mysqluserpwd":"root:ztgame@123",
     "mysqldb":"gtchat",
     "mysqltableprefix":"gtchat_",

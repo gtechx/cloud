@@ -72,6 +72,7 @@ type ConnData struct {
 	conn        net.Conn
 	tbl_appdata *gtdb.AppData
 	platform    string
+	sessChan    chan ISession
 }
 
 var newConnList = collections.NewSafeList() //*collections.SafeList
@@ -494,6 +495,7 @@ func dismissRoom(rid uint64) {
 	_, ok := roomMapLocal[rid]
 	if ok {
 		delete(roomMapLocal, rid)
+		dbMgr.UnSubRoomMsg(rid)
 	}
 
 	_, ok = roomAdminMapLocal[rid]
@@ -526,6 +528,7 @@ func loop() {
 			_, ok := sessMap[uid]
 			sess := CreateSess(conndata.conn, conndata.tbl_appdata, conndata.platform)
 			sess.Start()
+			conndata.sessChan <- sess
 
 			// uidarr = append(uidarr, conndata.tbl_appdata.ID)
 			// platformarr = append(platformarr, conndata.platform)
@@ -798,9 +801,12 @@ func onNewConn(conn net.Conn) {
 	isok = true
 	if err != nil {
 		fmt.Println(err.Error())
+		conn.Close()
 		return
 	}
 	fmt.Println("new msg msgtype:", msgtype, " id:", id, " size:", size, " msgid:", msgid)
+
+	sesschan := make(chan ISession, 1)
 	if msgid == MsgId_ReqChatLogin {
 		//chat login
 		var errcode uint16
@@ -830,8 +836,11 @@ func onNewConn(conn net.Conn) {
 		}
 
 		fmt.Println(tbl_appdata)
-		newConnList.Put(&ConnData{conn, tbl_appdata, req.Platform})
+		newConnList.Put(&ConnData{conn, tbl_appdata, req.Platform, sesschan})
 	}
+
+	sess := <-sesschan
+	sess.(*Sess).startSend()
 }
 
 func packageMsg(msgtype uint8, id uint16, msgid uint16, data interface{}) []byte {

@@ -2,12 +2,11 @@ package gtdb
 
 import (
 	"encoding/json"
-	"time"
+	"fmt"
+	"time" //"github.com/garyburd/redigo/redis"
 
-	//"github.com/garyburd/redigo/redis"
 	"github.com/go-redis/redis"
 	. "github.com/gtechx/base/common"
-
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 )
@@ -201,16 +200,20 @@ func (db *DBManager) Install() error {
 	var err error
 
 	if ret.Err() != nil {
+		fmt.Println("FlushDB error")
 		return ret.Err()
 	}
 
 	tx := db.sql.Begin()
 	for _, dbtable := range db_tables {
 		if err = tx.DropTableIfExists(dbtable).Error; err != nil {
+			fmt.Println("DropTableIfExists error")
 			tx.Rollback()
 			return err
 		}
-		if err = tx.CreateTable(dbtable).Error; err != nil {
+		//db.Set("gorm:table_options", "ENGINE=InnoDB DEFAULT CHARSET=utf8").
+		if err = tx.Set("gorm:table_options", "ENGINE=NDBCLUSTER").CreateTable(dbtable).Error; err != nil {
+			fmt.Println("CreateTable error")
 			tx.Rollback()
 			return err
 		}
